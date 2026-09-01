@@ -6,6 +6,8 @@ const UTC_EVENT: &str = "BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//ContextualW
 
 const ALL_DAY_EVENT: &str = "BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//ContextualWisdomLab//CalendarWeave v1//EN\r\nBEGIN:VEVENT\r\nUID:synthetic-all-day@example.test\r\nDTSTAMP:20260901T000000Z\r\nDTSTART;VALUE=DATE:20260902\r\nDTEND;VALUE=DATE:20260903\r\nSUMMARY:Synthetic all-day review\r\nEND:VEVENT\r\nEND:VCALENDAR\r\n";
 
+const TZID_EVENT: &str = "BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//ContextualWisdomLab//CalendarWeave v1//EN\r\nBEGIN:VEVENT\r\nUID:synthetic-tzid@example.test\r\nDTSTAMP:20260901T000000Z\r\nDTSTART;TZID=Asia/Seoul:20260902T090000\r\nDTEND;TZID=Asia/Seoul:20260902T100000\r\nSUMMARY:Synthetic timezone review\r\nEND:VEVENT\r\nEND:VCALENDAR\r\n";
+
 fn tenant(value: &str) -> TenantId {
     TenantId::parse(value).expect("synthetic tenant is valid")
 }
@@ -210,14 +212,46 @@ fn malformed_or_unsupported_calendar_input_fails_closed() {
         service.create_event(&tenant, &collection.collection_ref, "not iCalendar"),
         Err(CalendarError::MalformedCalendar)
     );
+}
+
+#[test]
+fn named_timezone_intervals_resolve_unambiguous_iana_instants() {
+    let mut service = InMemoryCalendarService::new();
+    let tenant = tenant("synthetic-tenant-a");
+    let collection = service
+        .create_collection(&tenant, "Synthetic timezone calendar")
+        .unwrap();
+
+    assert!(
+        service
+            .create_event(&tenant, &collection.collection_ref, TZID_EVENT)
+            .is_ok()
+    );
+
+    for malformed in [
+        TZID_EVENT.replace("DTEND;TZID=Asia/Seoul", "DTEND"),
+        TZID_EVENT.replace("DTEND;TZID=Asia/Seoul", "DTEND;TZID=America/New_York"),
+        TZID_EVENT.replace("DTEND;TZID=Asia/Seoul", "DTEND;TZID=Asia/Seoul;X-TEST=1"),
+        TZID_EVENT.replace("20260902T100000", "20260902T080000"),
+        TZID_EVENT
+            .replace("Asia/Seoul", "America/New_York")
+            .replace("20260902T090000", "20261101T013000")
+            .replace("20260902T100000", "20261101T023000"),
+        TZID_EVENT
+            .replace("Asia/Seoul", "America/New_York")
+            .replace("20260902T090000", "20260308T023000")
+            .replace("20260902T100000", "20260308T033000"),
+    ] {
+        assert_eq!(
+            service.create_event(&tenant, &collection.collection_ref, &malformed),
+            Err(CalendarError::MalformedCalendar)
+        );
+    }
     assert_eq!(
         service.create_event(
             &tenant,
             &collection.collection_ref,
-            &UTC_EVENT.replace(
-                "DTSTART:20260902T090000Z",
-                "DTSTART;TZID=Asia/Seoul:20260902T090000"
-            )
+            &TZID_EVENT.replace("Asia/Seoul", "Synthetic/Unknown"),
         ),
         Err(CalendarError::UnsupportedCapability)
     );
@@ -294,6 +328,15 @@ fn all_day_dates_use_an_exclusive_end() {
         service.create_event(&tenant, &collection.collection_ref, &mixed),
         Err(CalendarError::MalformedCalendar)
     );
+    for extra_parameter in [
+        ALL_DAY_EVENT.replace("DTSTART;VALUE=DATE", "DTSTART;VALUE=DATE;X-TEST=1"),
+        ALL_DAY_EVENT.replace("DTEND;VALUE=DATE", "DTEND;VALUE=DATE;X-TEST=1"),
+    ] {
+        assert_eq!(
+            service.create_event(&tenant, &collection.collection_ref, &extra_parameter,),
+            Err(CalendarError::MalformedCalendar)
+        );
+    }
 }
 
 #[test]
@@ -389,6 +432,10 @@ fn required_rfc_properties_and_supported_profile_fail_closed() {
             "SUMMARY:Synthetic planning review",
             "SUMMARY:Synthetic planning review\r\nSEQUENCE;X-TEST=1:1",
         ),
+        UTC_EVENT.replace(
+            "DTEND:20260902T100000Z",
+            "DTEND;TZID=Asia/Seoul:20260902T100000",
+        ),
     ];
     for payload in malformed {
         assert_eq!(
@@ -414,10 +461,6 @@ fn required_rfc_properties_and_supported_profile_fail_closed() {
         UTC_EVENT.replace(
             "DTSTART:20260902T090000Z",
             "DTSTART;X-TEST=1:20260902T090000Z",
-        ),
-        UTC_EVENT.replace(
-            "DTEND:20260902T100000Z",
-            "DTEND;TZID=Asia/Seoul:20260902T100000",
         ),
         UTC_EVENT.replace("DTEND:20260902T100000Z", "DTEND;X-TEST=1:20260902T100000Z"),
         UTC_EVENT.replace("DTEND:20260902T100000Z", "DTEND:not-a-date-time"),

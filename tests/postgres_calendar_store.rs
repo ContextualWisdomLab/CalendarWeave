@@ -8,6 +8,8 @@ use calendarweave::{
 
 const UTC_EVENT: &str = "BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//ContextualWisdomLab//CalendarWeave PostgreSQL Test//EN\r\nBEGIN:VEVENT\r\nUID:synthetic-postgres-event@example.test\r\nDTSTAMP:20260901T000000Z\r\nDTSTART:20260902T090000Z\r\nDTEND:20260902T100000Z\r\nSUMMARY:Synthetic durable review\r\nEND:VEVENT\r\nEND:VCALENDAR\r\n";
 
+const TZID_EVENT: &str = "BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//ContextualWisdomLab//CalendarWeave PostgreSQL Test//EN\r\nBEGIN:VEVENT\r\nUID:synthetic-postgres-tzid@example.test\r\nDTSTAMP:20260901T000000Z\r\nDTSTART;TZID=Asia/Seoul:20260902T090000\r\nDTEND;TZID=Asia/Seoul:20260902T100000\r\nSUMMARY:Synthetic durable timezone review\r\nEND:VEVENT\r\nEND:VCALENDAR\r\n";
+
 fn database_url() -> Option<String> {
     env::var("CALENDARWEAVE_TEST_DATABASE_URL").ok()
 }
@@ -319,6 +321,31 @@ fn postgres_projection_preserves_all_supported_status_values() {
             .unwrap();
         assert!(stored.iter().any(|candidate| candidate.status == expected));
     }
+}
+
+#[test]
+fn postgres_store_preserves_named_timezone_event_across_restart() {
+    let Some(database_url) = database_url() else {
+        return;
+    };
+    let run_id = uuid::Uuid::new_v4().simple().to_string();
+    let owner = tenant(&format!("synthetic-tzid-owner-{run_id}"));
+    let mut service = PostgresCalendarService::connect(&database_url).unwrap();
+    service.migrate().unwrap();
+    let collection = service
+        .create_collection(&owner, "Synthetic timezone calendar")
+        .unwrap();
+    let created = service
+        .create_event(&owner, &collection.collection_ref, TZID_EVENT)
+        .unwrap();
+
+    let restarted = PostgresCalendarService::connect(&database_url).unwrap();
+    assert_eq!(
+        restarted
+            .get_event(&owner, &collection.collection_ref, &created.event_ref)
+            .unwrap(),
+        created
+    );
 }
 
 #[test]

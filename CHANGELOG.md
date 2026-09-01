@@ -12,5 +12,7 @@
   authorization-before-parse error ordering.
 - Add a PostgreSQL 3NF persistence candidate with restart-stable create
   idempotency, append-only revisions, and serialized ETag concurrency.
+- Validate bounded IANA TZID intervals, including ambiguous and nonexistent
+  local times, through the shared event parser.
 - Fail closed for malformed, cross-tenant, stale-revision, and unsupported
   calendar requests with 100% owned line and branch coverage.
