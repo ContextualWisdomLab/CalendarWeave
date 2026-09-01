@@ -137,3 +137,76 @@ WHERE table_schema = 'public'
 SQL
 )"
 [[ "$tamper_table_count" == '0' ]]
+
+# Validation failures must happen before the restore executable is called.
+cat >"$tmp_dir/pg_restore_sentinel" <<EOF
+#!/usr/bin/env bash
+touch "$tmp_dir/restore_invoked"
+exit 0
+EOF
+chmod 700 "$tmp_dir/pg_restore_sentinel"
+
+validation_backup="$tmp_dir/validation.dump"
+printf 'validation archive' >"$validation_backup"
+printf 'not-a-sha256\n' >"$validation_backup.sha256"
+rm -f "$tmp_dir/restore_invoked"
+if CALENDARWEAVE_RESTORE_DATABASE_URL="$tamper_url" \
+   CALENDARWEAVE_BACKUP_PATH="$validation_backup" \
+   PG_RESTORE_BIN="$tmp_dir/pg_restore_sentinel" \
+   bash "$restore_script"; then
+    echo 'malformed checksum unexpectedly accepted' >&2
+    exit 1
+fi
+[[ ! -e "$tmp_dir/restore_invoked" ]]
+
+real_archive="$tmp_dir/real.dump"
+printf 'symlink validation archive' >"$real_archive"
+real_digest="$(sha256sum "$real_archive" | awk '{print $1}')"
+
+symlink_archive="$tmp_dir/symlink-archive.dump"
+ln -s "$real_archive" "$symlink_archive"
+printf '%s\n' "$real_digest" >"$symlink_archive.sha256"
+rm -f "$tmp_dir/restore_invoked"
+if CALENDARWEAVE_RESTORE_DATABASE_URL="$tamper_url" \
+   CALENDARWEAVE_BACKUP_PATH="$symlink_archive" \
+   PG_RESTORE_BIN="$tmp_dir/pg_restore_sentinel" \
+   bash "$restore_script"; then
+    echo 'symlinked backup archive unexpectedly accepted' >&2
+    exit 1
+fi
+[[ ! -e "$tmp_dir/restore_invoked" ]]
+
+regular_archive="$tmp_dir/regular-archive.dump"
+printf 'checksum symlink archive' >"$regular_archive"
+regular_digest="$(sha256sum "$regular_archive" | awk '{print $1}')"
+printf '%s\n' "$regular_digest" >"$tmp_dir/real-checksum.sha256"
+ln -s "$tmp_dir/real-checksum.sha256" "$regular_archive.sha256"
+rm -f "$tmp_dir/restore_invoked"
+if CALENDARWEAVE_RESTORE_DATABASE_URL="$tamper_url" \
+   CALENDARWEAVE_BACKUP_PATH="$regular_archive" \
+   PG_RESTORE_BIN="$tmp_dir/pg_restore_sentinel" \
+   bash "$restore_script"; then
+    echo 'symlinked backup checksum unexpectedly accepted' >&2
+    exit 1
+fi
+[[ ! -e "$tmp_dir/restore_invoked" ]]
+
+# Backup input validation must fail without publishing an artifact.
+if CALENDARWEAVE_DATABASE_URL="$source_url" \
+   CALENDARWEAVE_BACKUP_PATH='relative-calendarweave.dump' \
+   PG_DUMP_BIN=/bin/true \
+   bash "$backup_script"; then
+    echo 'relative backup path unexpectedly accepted' >&2
+    exit 1
+fi
+
+empty_backup="$tmp_dir/empty.dump"
+if CALENDARWEAVE_DATABASE_URL="$source_url" \
+   CALENDARWEAVE_BACKUP_PATH="$empty_backup" \
+   PG_DUMP_BIN=/bin/true \
+   bash "$backup_script"; then
+    echo 'empty pg_dump output unexpectedly published' >&2
+    exit 1
+fi
+[[ ! -e "$empty_backup" ]]
+[[ ! -e "$empty_backup.sha256" ]]
