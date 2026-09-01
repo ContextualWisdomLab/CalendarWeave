@@ -10,11 +10,13 @@ create/conditional-update/list/get. The stacked ADR-0003 candidate adds a 3NF
 PostgreSQL store with durable identity, append-only revisions, and row-locked
 ETag updates. The stacked ADR-0004 candidate adds bounded IANA TZID interval
 validation through the shared parser. ADR-0005 adds a fail-closed application
-admission ACL around the Calendar Resource Core: it consumes an externally
-verified issuer/subject principal bound to one tenant scope, asks an external
-authorization port for a typed decision, and authorizes before calendar parsing.
-None changes the protected-main, service-authentication, CalDAV, deployment,
-backup-operation, or consumer-migration evidence boundary above.
+admission ACL around the Calendar Resource Core: it consumes externally verified
+issuer/subject evidence with no caller-selected tenant, presents the exact action
+and resource references to an external authorization port, and uses only the
+authorization-derived tenant when delegating to the core. Authorization precedes
+calendar parsing. None changes the protected-main, service-authentication,
+CalDAV, deployment, backup-operation, or consumer-migration evidence boundary
+above.
 
 ## Product responsibility
 
@@ -36,8 +38,8 @@ CalendarWeave does **not** own mail/threading, project/task semantics, Naruon co
 
 ```mermaid
 flowchart LR
-  keyverse[Keyverse\nIdentity & Authorization Authority] -->|verified principal + policy decision via ACL| admission[CalendarWeave\nAuthorization Admission]
-  admission -->|tenant-bound admitted operation| calendar[CalendarWeave\nCalendar Resource Core]
+  keyverse[Keyverse\nIdentity & Authorization Authority] -->|verified issuer/subject + resource-aware policy decision| admission[CalendarWeave\nAuthorization Admission]
+  admission -->|authorization-derived tenant operation| calendar[CalendarWeave\nCalendar Resource Core]
   provider[CalDAV / Google / Outlook\nprovider calendars] <-->|versioned calendar adapter| calendar
 
   naruon[Naruon\nWorkspace Scheduling & Commitments] -->|Calendar Port / ACL\nevent refs + revisions + free/busy| admission
@@ -52,9 +54,9 @@ The Calendar Resource Core is the core subdomain. Authorization Admission and pr
 
 ### CalendarWeave ↔ Keyverse
 
-Keyverse is the external identity/federation and authorization-control-plane owner. CalendarWeave accepts no raw bearer-token authority merely because token bytes exist. A future infrastructure adapter must verify the applicable Keyverse issuer/token/session contract and obtain an authorization decision before constructing `ScopedIdentity` and invoking the Calendar Resource Core through `AuthorizedCalendarService`.
+Keyverse is the external identity/federation and authorization-control-plane owner. CalendarWeave accepts no raw bearer-token authority merely because token bytes exist. A future infrastructure adapter must verify the applicable Keyverse issuer/token/session contract, construct tenant-free `ExternalIdentity`, evaluate the exact `CalendarAuthorizationRequest`, and return the admitted `TenantId` before `AuthorizedCalendarService` invokes the Calendar Resource Core. Callers never supply tenant scope through the admission service.
 
-The principal key is issuer plus subject; subject text alone is not treated as globally unique. CalendarWeave keeps issuer/subject opaque and does not copy Keyverse user, credential, session or policy tables. `CalendarAuthorizationPort` is the Anti-Corruption Layer for policy decisions; provider-specific claims or DTOs terminate at that boundary.
+The principal key is issuer plus subject; subject text alone is not treated as globally unique. CalendarWeave keeps issuer/subject opaque and does not copy Keyverse user, credential, session or policy tables. `CalendarAuthorizationPort` is the Anti-Corruption Layer for policy decisions; provider-specific claims or DTOs terminate at that boundary. The request includes the exact opaque collection/event references needed for resource-scoped authorization without exposing CalendarWeave persistence.
 
 ### CalendarWeave ↔ Naruon
 
@@ -81,8 +83,8 @@ CalendarWeave does not interpret or calculate Four Pillars. `four-pillars` remai
 | Concern | Authoritative owner | Consumers / notes |
 | --- | --- | --- |
 | Calendar collection/event resource and revision | CalendarWeave | Naruon, LineageWeave, saju-caldav, external clients |
-| Calendar operation admission | CalendarWeave | Typed action + tenant-bound application ACL; no token verifier or local policy store |
-| Identity, federation and external authorization policy | Keyverse | CalendarWeave consumes already-verified issuer/subject identity and decisions through an ACL |
+| Calendar operation admission | CalendarWeave | Tenant-free external identity + resource-aware typed request; authorization authority derives tenant; no token verifier or local policy store |
+| Identity, federation and external authorization policy | Keyverse | CalendarWeave consumes verified issuer/subject identity and resource-aware policy decisions through an ACL |
 | iCalendar / CalDAV protocol semantics | CalendarWeave | Consumer products use ports/adapters |
 | Provider calendar sync and revision receipts | CalendarWeave | Consumer-specific authorization intent remains with consumer |
 | Workspace commitment/conflict decision | Naruon | References CalendarWeave event/resource evidence |
@@ -95,11 +97,13 @@ CalendarWeave does not interpret or calculate Four Pillars. `four-pillars` remai
 
 - `CalendarCollection` is the collection identity boundary and owns membership of event resources in one tenant scope.
 - `CalendarEvent` represents the current read projection of an immutable-UID event resource; revision transitions remain conditional on the current strong ETag.
-- `TenantId` and `ScopedIdentity` are value objects. `ScopedIdentity` never becomes a persisted calendar aggregate merely because admission used it.
-- `AuthorizedCalendarService` is an application/domain-facing service, not an aggregate. It obtains authorization before domain processing and delegates one item-level operation at a time.
+- `TenantId` and `ExternalIdentity` are value objects. `ExternalIdentity` has no tenant authority and never becomes a persisted calendar aggregate merely because admission used it.
+- `CalendarAuthorizationRequest` is a request value carrying only action and opaque target references required by authorization; it is not persisted as a calendar aggregate.
+- `AuthorizedCalendarService` is an application/domain-facing service, not an aggregate. It obtains authorization before domain processing and delegates one item-level operation at a time using only the returned tenant.
 - `CalendarAuthorizationPort` and future provider adapters are repositories/ports only in the DDD integration sense; they do not grant direct access to CalendarWeave relational tables.
 - Event create idempotency is collection + RFC UID; updates preserve immutable UID and advance one revision only under the expected ETag.
 - A denied or unavailable authorization decision cannot become parser, storage or mutation authority.
+- A caller-provided tenant string cannot become authorization authority; the tenant used by the core is derived by the trusted authorization decision for the exact request.
 
 ## Migration invariant
 
@@ -127,7 +131,7 @@ The executable PostgreSQL candidate uses the singular multiword equivalents `cal
 
 ## Trust
 
-Fail closed without purpose-limited identity and authorization. Consume Keyverse through an infrastructure ACL; do not stand up a local IdP or treat an arbitrary tenant string as proof of permission. Authorization precedes parsing and mutation at the application boundary. Necessary attendee/organizer data remains usable under least privilege, tenant/purpose isolation, encryption, retention and access/export audit rather than blanket masking. Provider credentials, raw Authorization data and bearer tokens are never domain attributes or ordinary telemetry.
+Fail closed without purpose-limited identity and authorization. Consume Keyverse through an infrastructure ACL; do not stand up a local IdP or treat an arbitrary tenant string as proof of permission. `ExternalIdentity` carries only verified issuer/subject evidence. The authorization adapter evaluates the exact action/resource request and derives the tenant used by the core. Authorization precedes parsing and mutation at the application boundary. Necessary attendee/organizer data remains usable under least privilege, tenant/purpose isolation, encryption, retention and access/export audit rather than blanket masking. Provider credentials, raw Authorization data and bearer tokens are never domain attributes or ordinary telemetry.
 
 The current ADR-0005 candidate proves only an in-process admission contract. HTTP/service authentication, token verification, durable authorization/audit evidence, rate limiting, production Keyverse integration, CSAP/SOC 2 operational evidence, and released interoperability remain open.
 
