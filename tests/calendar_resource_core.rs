@@ -1,6 +1,6 @@
 //! Contract tests for the first tenant-scoped calendar-resource vertical.
 
-use calendarweave::{CalendarError, CalendarPort, InMemoryCalendarService, TenantId};
+use calendarweave::{CalendarError, CalendarPort, EventStatus, InMemoryCalendarService, TenantId};
 
 const UTC_EVENT: &str = "BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//ContextualWisdomLab//CalendarWeave v1//EN\r\nBEGIN:VEVENT\r\nUID:synthetic-event-1@example.test\r\nDTSTAMP:20260901T000000Z\r\nDTSTART:20260902T090000Z\r\nDTEND:20260902T100000Z\r\nSUMMARY:Synthetic planning review\r\nEND:VEVENT\r\nEND:VCALENDAR\r\n";
 
@@ -27,6 +27,7 @@ fn tenant_scoped_create_list_and_get_preserve_the_event() {
 
     assert_eq!(created.uid, "synthetic-event-1@example.test");
     assert_eq!(created.summary, "Synthetic planning review");
+    assert_eq!(created.status, EventStatus::Confirmed);
     assert_eq!(created.revision, 1);
     assert!(created.etag.starts_with('"') && created.etag.ends_with('"'));
     assert_eq!(
@@ -41,6 +42,54 @@ fn tenant_scoped_create_list_and_get_preserve_the_event() {
             .unwrap(),
         created
     );
+}
+
+#[test]
+fn event_status_is_preserved_without_importing_conflict_policy() {
+    let tenant = tenant("synthetic-tenant-a");
+    let mut service = InMemoryCalendarService::new();
+    let collection = service
+        .create_collection(&tenant, "Synthetic calendar")
+        .unwrap();
+    for (status_text, expected) in [
+        ("CONFIRMED", EventStatus::Confirmed),
+        ("TENTATIVE", EventStatus::Tentative),
+        ("CANCELLED", EventStatus::Cancelled),
+    ] {
+        let payload = UTC_EVENT
+            .replace("synthetic-event-1", &format!("synthetic-{status_text}"))
+            .replace(
+                "SUMMARY:Synthetic planning review",
+                &format!("SUMMARY:Synthetic planning review\r\nSTATUS:{status_text}"),
+            );
+        assert_eq!(
+            service
+                .create_event(&tenant, &collection.collection_ref, &payload)
+                .unwrap()
+                .status,
+            expected
+        );
+    }
+
+    for payload in [
+        UTC_EVENT.replace(
+            "SUMMARY:Synthetic planning review",
+            "SUMMARY:Synthetic planning review\r\nSTATUS:UNKNOWN",
+        ),
+        UTC_EVENT.replace(
+            "SUMMARY:Synthetic planning review",
+            "SUMMARY:Synthetic planning review\r\nSTATUS;X-TEST=1:CONFIRMED",
+        ),
+        UTC_EVENT.replace(
+            "SUMMARY:Synthetic planning review",
+            "SUMMARY:Synthetic planning review\r\nSTATUS:CONFIRMED\r\nSTATUS:CANCELLED",
+        ),
+    ] {
+        assert_eq!(
+            service.create_event(&tenant, &collection.collection_ref, &payload),
+            Err(CalendarError::MalformedCalendar)
+        );
+    }
 }
 
 #[test]

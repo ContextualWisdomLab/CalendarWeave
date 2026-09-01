@@ -10,8 +10,9 @@ use chrono::{NaiveDate, NaiveDateTime};
 use icalendar::{Calendar, CalendarComponent, Component, Property};
 use uuid::Uuid;
 
-const ALLOWED_EVENT_PROPERTIES: [&str; 6] =
-    ["UID", "DTSTAMP", "DTSTART", "DTEND", "SUMMARY", "SEQUENCE"];
+const ALLOWED_EVENT_PROPERTIES: [&str; 7] = [
+    "UID", "DTSTAMP", "DTSTART", "DTEND", "SUMMARY", "SEQUENCE", "STATUS",
+];
 
 /// A bounded failure returned by the calendar-resource application port.
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -75,12 +76,25 @@ pub struct CalendarEvent {
     pub uid: String,
     /// Buyer-visible RFC 5545 summary.
     pub summary: String,
+    /// RFC 5545 event status; an omitted property means confirmed.
+    pub status: EventStatus,
     /// Monotonic `CalendarWeave` revision; initial creation is revision one.
     pub revision: u64,
     /// Strong revision token suitable for an eventual If-Match boundary.
     pub etag: String,
     /// Original validated RFC 5545 calendar representation.
     pub icalendar: String,
+}
+
+/// Supported RFC 5545 VEVENT status values.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum EventStatus {
+    /// The event is confirmed, including when STATUS is omitted.
+    Confirmed,
+    /// The event is tentative.
+    Tentative,
+    /// The event is cancelled; consuming conflict policy decides occupancy.
+    Cancelled,
 }
 
 /// Versioned application port consumed by service or package adapters.
@@ -228,6 +242,7 @@ impl CalendarPort for InMemoryCalendarService {
             collection_ref: record.collection.collection_ref.clone(),
             uid: parsed.uid.clone(),
             summary: parsed.summary,
+            status: parsed.status,
             revision: 1,
             etag: format!("\"{event_ref}:1\""),
             icalendar: icalendar.to_owned(),
@@ -269,6 +284,7 @@ impl CalendarPort for InMemoryCalendarService {
 struct ParsedEvent {
     uid: String,
     summary: String,
+    status: EventStatus,
 }
 
 fn parse_event(input: &str) -> Result<ParsedEvent, CalendarError> {
@@ -299,6 +315,7 @@ fn parse_event(input: &str) -> Result<ParsedEvent, CalendarError> {
     }
     let uid = required_text(event.properties().get("UID"))?;
     let summary = required_text(event.properties().get("SUMMARY"))?;
+    let status = parse_status(event.properties().get("STATUS"))?;
     validate_utc("DTSTAMP", event.properties().get("DTSTAMP"))?;
     validate_interval(
         event.properties().get("DTSTART"),
@@ -309,7 +326,11 @@ fn parse_event(input: &str) -> Result<ParsedEvent, CalendarError> {
     {
         return Err(CalendarError::MalformedCalendar);
     }
-    Ok(ParsedEvent { uid, summary })
+    Ok(ParsedEvent {
+        uid,
+        summary,
+        status,
+    })
 }
 
 fn validate_singleton_properties(input: &str) -> Result<(), CalendarError> {
@@ -326,15 +347,32 @@ fn validate_singleton_properties(input: &str) -> Result<(), CalendarError> {
             return Err(CalendarError::MalformedCalendar);
         }
     }
-    if input
-        .split("\r\n")
-        .filter(|line| property_name(line) == Some("SEQUENCE"))
-        .count()
-        > 1
-    {
-        return Err(CalendarError::MalformedCalendar);
+    for optional in ["SEQUENCE", "STATUS"] {
+        if input
+            .split("\r\n")
+            .filter(|line| property_name(line) == Some(optional))
+            .count()
+            > 1
+        {
+            return Err(CalendarError::MalformedCalendar);
+        }
     }
     Ok(())
+}
+
+fn parse_status(property: Option<&Property>) -> Result<EventStatus, CalendarError> {
+    let Some(property) = property else {
+        return Ok(EventStatus::Confirmed);
+    };
+    if !property.params().is_empty() {
+        return Err(CalendarError::MalformedCalendar);
+    }
+    match property.value() {
+        "CONFIRMED" => Ok(EventStatus::Confirmed),
+        "TENTATIVE" => Ok(EventStatus::Tentative),
+        "CANCELLED" => Ok(EventStatus::Cancelled),
+        _ => Err(CalendarError::MalformedCalendar),
+    }
 }
 
 fn property_name(line: &str) -> Option<&str> {

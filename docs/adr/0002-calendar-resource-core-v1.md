@@ -27,13 +27,16 @@ The accepted RFC 5545 profile is deliberately narrow:
 - exactly one `VEVENT` with one each of `UID`, `DTSTAMP`, `DTSTART`, `DTEND`,
   and `SUMMARY`;
 - UTC `DATE-TIME` intervals or all-day `DATE` intervals with an exclusive end;
-- optional singleton `SEQUENCE` only;
+- optional singleton `SEQUENCE` and `STATUS`; omitted `STATUS` means
+  `CONFIRMED`, while `CONFIRMED`, `TENTATIVE`, and `CANCELLED` are preserved;
 - CRLF input and preserved validated source representation;
 - identical repeated create by collection plus UID is idempotent;
 - changed content for an existing UID fails as `StaleRevision` rather than
   overwriting evidence.
 
-TZID/floating time, recurrence, attendees, alarms, scheduling, provider
+CalendarWeave does not decide whether a cancelled or tentative event occupies
+time; that remains consumer conflict policy. TZID/floating time, recurrence,
+attendees, alarms, scheduling, provider
 mapping, sync, update/delete, and CalDAV/WebDAV are unavailable capabilities.
 The parser rejects them explicitly instead of silently discarding fields.
 
