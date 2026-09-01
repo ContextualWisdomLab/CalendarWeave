@@ -67,3 +67,23 @@ jobs:
           cargo llvm-cov --all-features --branch
           --fail-under-lines 100 --json --output-path coverage.json
       - run: jq -e '.data[0].totals.branches.percent == 100' coverage.json
+
+  recovery:
+    runs-on: ubuntu-24.04
+    services:
+      postgres:
+        image: postgres:18.4-alpine@sha256:9a8afca54e7861fd90fab5fdf4c42477a6b1cb7d293595148e674e0a3181de15
+        env:
+          POSTGRES_DB: calendarweave_test
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d calendarweave_test"
+          --health-interval 2s
+          --health-timeout 5s
+          --health-retries 20
+    steps:
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+      - name: Prove logical backup and restore invariants
+        run: bash tests/postgres_recovery_drill.sh
