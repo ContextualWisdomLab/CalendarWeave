@@ -1,13 +1,31 @@
 # CalendarWeave
 
-Standalone CalDAV/iCalendar PIMS. Open this repo when you need calendar as its own product. LineageWeave, naruon, and Outlook consume it fail-closed. Do not put calendar chrome in naruon mail or LineageWeave #74.
+[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/ContextualWisdomLab/CalendarWeave)
 
-## Customer next action
+**Governed calendar resources, iCalendar semantics, and interoperable scheduling infrastructure.**
 
-1. Point your CalDAV client at the CalendarWeave endpoint for the tenant you already use.
-2. Create or accept an event in that client. Confirm it appears here, not in naruon mail or a LineageWeave board.
-3. If sync fails, stop and check the CalendarWeave connection. Do not copy events into mail or #74.
+CalendarWeave is the ContextualWisdomLab calendar-resource product: a focused home for versioned calendar collections, events, revisions, timezone/recurrence semantics, CalDAV interoperability, and provider-facing calendar adapters.
 
-## What this is not
+## Current status
 
-Not mail. Not tasks. Not a local IdP. Not GRC policy. Not LineageWeave #74.
+CalendarWeave is under active foundation development. The current work is establishing a tenant-scoped Calendar Resource Core, durable persistence, and strict RFC 5545 time semantics before any production service or migration claim is made.
+
+The repository does **not** yet advertise a released CalDAV endpoint or production deployment. Follow the repository releases and architecture documentation for supported capabilities as they become available.
+
+## Product direction
+
+The first releasable vertical is intentionally small and testable:
+
+1. create a tenant-scoped calendar collection;
+2. create and retrieve an RFC 5545 VEVENT with stable identity and revision evidence;
+3. preserve timezone and interval semantics fail-closed;
+4. persist the resource through a durable adapter; and
+5. expose a versioned application contract that other products can consume without database coupling.
+
+## Documentation
+
+- [Architecture](ARCHITECTURE.md)
+- [Documentation home](docs/index.md)
+- [Architecture decisions](docs/adr/)
+
+CalendarWeave keeps generic calendar-resource responsibility separate from consumer-specific workflow or domain policy. Those integration boundaries are documented in the architecture and ADRs rather than exposed as customer-facing repository instructions.
