@@ -10,5 +10,7 @@
   importing consumer conflict policy.
 - Add tenant-safe strong-ETag conditional update with immutable UID and
   authorization-before-parse error ordering.
+- Add a PostgreSQL 3NF persistence candidate with restart-stable create
+  idempotency, append-only revisions, and serialized ETag concurrency.
 - Fail closed for malformed, cross-tenant, stale-revision, and unsupported
   calendar requests with 100% owned line and branch coverage.

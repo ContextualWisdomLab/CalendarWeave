@@ -16,18 +16,25 @@ Not mail. Not tasks. Not a local IdP. Not GRC policy. Not LineageWeave #74.
 
 The branch stacked above architecture PR #1 contains a Rust v0.1 application
 port for tenant-scoped collection creation and strict RFC 5545 VEVENT
-create/conditional-update/list/get. It accepts UTC or all-day intervals and returns opaque event
-references with revision/ETag evidence. Unsupported calendar capabilities fail
-closed.
+create/conditional-update/list/get. It accepts UTC or all-day intervals and
+returns opaque event references with revision/ETag evidence. The stacked
+ADR-0003 candidate adds a PostgreSQL adapter with restart-stable identity,
+append-only revisions, and database-serialized conditional writes.
+Unsupported calendar capabilities fail closed.
 
-This is an in-memory conformance adapter, not protected-main, durable storage,
-CalDAV, a deployed service, or a released migration contract. See ADR 0002.
+These are implementation candidates, not protected-main, CalDAV, a deployed
+service, operated backup/recovery evidence, or a released migration contract.
+See ADR-0002 and ADR-0003.
 
 ```bash
 cargo fmt --check
 cargo clippy --all-targets --all-features -- -D warnings
 cargo test --all-features
-cargo +nightly llvm-cov --all-features --branch \
+# Set only for real PostgreSQL acceptance; without it those tests self-skip.
+CALENDARWEAVE_TEST_DATABASE_URL='host=/tmp dbname=calendarweave_test' \
+  cargo test --all-features
+CALENDARWEAVE_TEST_DATABASE_URL='host=/tmp dbname=calendarweave_test' \
+  cargo +nightly llvm-cov --all-features --branch \
   --fail-under-lines 100 --json --output-path coverage.json
 jq -e '.data[0].totals.branches.percent == 100' coverage.json
 ```
