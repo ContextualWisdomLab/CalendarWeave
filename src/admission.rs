@@ -1,9 +1,11 @@
 //! Fail-closed authorization admission for calendar-resource operations.
 //!
-//! This module is an Anti-Corruption Layer between an external identity and
-//! authorization authority and the Calendar Resource Core. It consumes scoped
-//! identity evidence; it does not validate tokens, implement an identity
-//! provider, or move authorization policy into calendar domain entities.
+//! This module is an Anti-Corruption Layer between external identity and
+//! authorization authorities and the Calendar Resource Core. The caller
+//! supplies only externally verified issuer/subject identity evidence. The
+//! authorization adapter derives the authorized tenant and receives the exact
+//! requested calendar-resource context; callers cannot self-assert a tenant
+//! through the admission service.
 
 use crate::{CalendarCollection, CalendarError, CalendarEvent, CalendarPort, TenantId};
 
@@ -22,45 +24,39 @@ pub enum AuthorizationError {
 /// Calendar Resource Core actions evaluated at the admission boundary.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum CalendarAction {
-    /// Create a collection in the identity's tenant scope.
+    /// Create a collection in the tenant scope returned by authorization.
     CreateCollection,
-    /// Create a calendar event in an authorized tenant-scoped collection.
+    /// Create a calendar event in an authorized collection.
     CreateEvent,
-    /// Read calendar events from an authorized tenant-scoped collection.
+    /// Read calendar events from an authorized collection or event resource.
     ReadEvents,
-    /// Conditionally revise an existing calendar event.
+    /// Conditionally revise an authorized calendar event.
     UpdateEvent,
 }
 
-/// External principal identity bound to one authorized tenant scope.
+/// Externally verified principal identity before tenant authorization.
 ///
 /// Issuer and subject are retained together because an OpenID Connect subject
-/// is only unique within its issuer. CalendarWeave deliberately treats both as
-/// opaque external identifiers rather than inventing local identity semantics.
+/// is only unique within its issuer. The value contains no tenant scope: the
+/// trusted authorization adapter must derive that scope for each request.
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct ScopedIdentity {
+pub struct ExternalIdentity {
     issuer: String,
     subject: String,
-    tenant_id: TenantId,
 }
 
-impl ScopedIdentity {
-    /// Build an externally verified principal bound to one tenant scope.
+impl ExternalIdentity {
+    /// Build opaque identity evidence from an already verified issuer/subject pair.
     ///
     /// The byte limits are defensive admission bounds, not an attempt to
-    /// redefine OpenID Connect or JWT identifier syntax. Spaces and other
-    /// ordinary Unicode are therefore preserved while control characters are
-    /// rejected at this boundary.
+    /// redefine OpenID Connect or JWT identifier syntax. Spaces and ordinary
+    /// Unicode are preserved while control characters are rejected.
     ///
     /// # Errors
     ///
     /// Returns [`CalendarError::InvalidInput`] for an empty, over-limit, or
     /// control-character-bearing issuer or subject.
-    pub fn parse(
-        issuer: &str,
-        subject: &str,
-        tenant_id: TenantId,
-    ) -> Result<Self, CalendarError> {
+    pub fn parse(issuer: &str, subject: &str) -> Result<Self, CalendarError> {
         if !bounded_identifier(issuer, MAX_ISSUER_BYTES)
             || !bounded_identifier(subject, MAX_SUBJECT_BYTES)
         {
@@ -69,7 +65,6 @@ impl ScopedIdentity {
         Ok(Self {
             issuer: issuer.to_owned(),
             subject: subject.to_owned(),
-            tenant_id,
         })
     }
 
@@ -84,20 +79,87 @@ impl ScopedIdentity {
     pub fn subject(&self) -> &str {
         &self.subject
     }
+}
 
-    /// Return the tenant scope admitted for this external principal.
+/// Exact calendar resource context presented to the authorization authority.
+///
+/// `collection_ref` and `event_ref` are opaque resource references. They let a
+/// policy adapter enforce resource-scoped grants without exposing calendar
+/// persistence or forcing CalendarWeave to own the external policy model.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct CalendarAuthorizationRequest<'a> {
+    action: CalendarAction,
+    collection_ref: Option<&'a str>,
+    event_ref: Option<&'a str>,
+}
+
+impl<'a> CalendarAuthorizationRequest<'a> {
+    fn create_collection() -> Self {
+        Self {
+            action: CalendarAction::CreateCollection,
+            collection_ref: None,
+            event_ref: None,
+        }
+    }
+
+    fn create_event(collection_ref: &'a str) -> Self {
+        Self {
+            action: CalendarAction::CreateEvent,
+            collection_ref: Some(collection_ref),
+            event_ref: None,
+        }
+    }
+
+    fn list_events(collection_ref: &'a str) -> Self {
+        Self {
+            action: CalendarAction::ReadEvents,
+            collection_ref: Some(collection_ref),
+            event_ref: None,
+        }
+    }
+
+    fn get_event(collection_ref: &'a str, event_ref: &'a str) -> Self {
+        Self {
+            action: CalendarAction::ReadEvents,
+            collection_ref: Some(collection_ref),
+            event_ref: Some(event_ref),
+        }
+    }
+
+    fn update_event(collection_ref: &'a str, event_ref: &'a str) -> Self {
+        Self {
+            action: CalendarAction::UpdateEvent,
+            collection_ref: Some(collection_ref),
+            event_ref: Some(event_ref),
+        }
+    }
+
+    /// Return the typed Calendar Resource action being requested.
     #[must_use]
-    pub fn tenant_id(&self) -> &TenantId {
-        &self.tenant_id
+    pub fn action(&self) -> CalendarAction {
+        self.action
+    }
+
+    /// Return the exact opaque collection reference when the action targets one.
+    #[must_use]
+    pub fn collection_ref(&self) -> Option<&str> {
+        self.collection_ref
+    }
+
+    /// Return the exact opaque event reference when the action targets one.
+    #[must_use]
+    pub fn event_ref(&self) -> Option<&str> {
+        self.event_ref
     }
 }
 
 /// External authorization port consumed before calendar-domain processing.
 ///
-/// A concrete adapter may consult Keyverse-scoped claims or another approved
-/// policy service, but the domain core remains independent of that provider.
+/// A concrete adapter may validate Keyverse-issued claims and consult an
+/// approved policy service. Its successful result is the tenant scope that was
+/// actually authorized for this identity, action, and resource context.
 pub trait CalendarAuthorizationPort {
-    /// Decide whether an identity may perform one Calendar Resource Core action.
+    /// Authorize one exact Calendar Resource request and derive its tenant scope.
     ///
     /// # Errors
     ///
@@ -106,15 +168,16 @@ pub trait CalendarAuthorizationPort {
     /// can be established.
     fn authorize(
         &self,
-        identity: &ScopedIdentity,
-        action: CalendarAction,
-    ) -> Result<(), AuthorizationError>;
+        identity: &ExternalIdentity,
+        request: &CalendarAuthorizationRequest<'_>,
+    ) -> Result<TenantId, AuthorizationError>;
 }
 
 /// Admission service that authorizes before delegating to a calendar port.
 ///
 /// The wrapper does not expose its inner calendar adapter, preventing callers
-/// from accidentally bypassing the admission decision through this surface.
+/// from bypassing admission through this surface. The tenant passed into the
+/// core always comes from the authorization result rather than caller input.
 pub struct AuthorizedCalendarService<A, P> {
     authorization: A,
     calendar: P,
@@ -134,7 +197,7 @@ where
         }
     }
 
-    /// Create a collection after an affirmative external authorization decision.
+    /// Create a collection after authorization derives the permitted tenant.
     ///
     /// # Errors
     ///
@@ -142,19 +205,18 @@ where
     /// validation/storage error.
     pub fn create_collection(
         &mut self,
-        identity: &ScopedIdentity,
+        identity: &ExternalIdentity,
         display_name: &str,
     ) -> Result<CalendarCollection, CalendarError> {
-        self.authorize(identity, CalendarAction::CreateCollection)?;
-        self.calendar
-            .create_collection(identity.tenant_id(), display_name)
+        let tenant_id = self.authorize(identity, &CalendarAuthorizationRequest::create_collection())?;
+        self.calendar.create_collection(&tenant_id, display_name)
     }
 
-    /// Create an event only after authorization succeeds.
+    /// Create an event only after resource-aware authorization succeeds.
     ///
-    /// Authorization intentionally precedes calendar parsing so denied callers
-    /// cannot use parser behavior or resource existence as an information side
-    /// channel through this application boundary.
+    /// Authorization intentionally precedes collection lookup and calendar
+    /// parsing so denied callers cannot use resource or parser behavior as an
+    /// information side channel through this application boundary.
     ///
     /// # Errors
     ///
@@ -162,16 +224,19 @@ where
     /// validation/storage error.
     pub fn create_event(
         &mut self,
-        identity: &ScopedIdentity,
+        identity: &ExternalIdentity,
         collection_ref: &str,
         icalendar: &str,
     ) -> Result<CalendarEvent, CalendarError> {
-        self.authorize(identity, CalendarAction::CreateEvent)?;
+        let tenant_id = self.authorize(
+            identity,
+            &CalendarAuthorizationRequest::create_event(collection_ref),
+        )?;
         self.calendar
-            .create_event(identity.tenant_id(), collection_ref, icalendar)
+            .create_event(&tenant_id, collection_ref, icalendar)
     }
 
-    /// Conditionally revise an event after authorization succeeds.
+    /// Conditionally revise an event after exact resource authorization succeeds.
     ///
     /// # Errors
     ///
@@ -179,15 +244,18 @@ where
     /// validation, not-found, or storage error.
     pub fn update_event(
         &mut self,
-        identity: &ScopedIdentity,
+        identity: &ExternalIdentity,
         collection_ref: &str,
         event_ref: &str,
         if_match: &str,
         icalendar: &str,
     ) -> Result<CalendarEvent, CalendarError> {
-        self.authorize(identity, CalendarAction::UpdateEvent)?;
+        let tenant_id = self.authorize(
+            identity,
+            &CalendarAuthorizationRequest::update_event(collection_ref, event_ref),
+        )?;
         self.calendar.update_event(
-            identity.tenant_id(),
+            &tenant_id,
             collection_ref,
             event_ref,
             if_match,
@@ -195,7 +263,7 @@ where
         )
     }
 
-    /// List events after a positive read authorization decision.
+    /// List events after collection-scoped read authorization succeeds.
     ///
     /// # Errors
     ///
@@ -203,15 +271,17 @@ where
     /// storage error.
     pub fn list_events(
         &self,
-        identity: &ScopedIdentity,
+        identity: &ExternalIdentity,
         collection_ref: &str,
     ) -> Result<Vec<CalendarEvent>, CalendarError> {
-        self.authorize(identity, CalendarAction::ReadEvents)?;
-        self.calendar
-            .list_events(identity.tenant_id(), collection_ref)
+        let tenant_id = self.authorize(
+            identity,
+            &CalendarAuthorizationRequest::list_events(collection_ref),
+        )?;
+        self.calendar.list_events(&tenant_id, collection_ref)
     }
 
-    /// Read one event after a positive read authorization decision.
+    /// Read one event after exact collection/event authorization succeeds.
     ///
     /// # Errors
     ///
@@ -219,22 +289,25 @@ where
     /// storage error.
     pub fn get_event(
         &self,
-        identity: &ScopedIdentity,
+        identity: &ExternalIdentity,
         collection_ref: &str,
         event_ref: &str,
     ) -> Result<CalendarEvent, CalendarError> {
-        self.authorize(identity, CalendarAction::ReadEvents)?;
+        let tenant_id = self.authorize(
+            identity,
+            &CalendarAuthorizationRequest::get_event(collection_ref, event_ref),
+        )?;
         self.calendar
-            .get_event(identity.tenant_id(), collection_ref, event_ref)
+            .get_event(&tenant_id, collection_ref, event_ref)
     }
 
     fn authorize(
         &self,
-        identity: &ScopedIdentity,
-        action: CalendarAction,
-    ) -> Result<(), CalendarError> {
+        identity: &ExternalIdentity,
+        request: &CalendarAuthorizationRequest<'_>,
+    ) -> Result<TenantId, CalendarError> {
         self.authorization
-            .authorize(identity, action)
+            .authorize(identity, request)
             .map_err(|error| match error {
                 AuthorizationError::Denied => CalendarError::Unauthorized,
                 AuthorizationError::Unavailable => CalendarError::AuthorizationUnavailable,
