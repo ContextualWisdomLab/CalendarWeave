@@ -11,6 +11,7 @@ use chrono_tz::Tz;
 use icalendar::{Calendar, CalendarComponent, Component, Property};
 use uuid::Uuid;
 
+pub mod admission;
 pub mod postgres_store;
 
 const ALLOWED_EVENT_PROPERTIES: [&str; 7] = [
@@ -22,6 +23,10 @@ const ALLOWED_EVENT_PROPERTIES: [&str; 7] = [
 pub enum CalendarError {
     /// An identity or display value does not satisfy the public contract.
     InvalidInput,
+    /// The external authorization authority denied the requested action.
+    Unauthorized,
+    /// Authorization could not be established, so the operation failed closed.
+    AuthorizationUnavailable,
     /// The resource is absent or belongs to another tenant.
     NotFound,
     /// The payload is not the supported RFC 5545 structure.
