@@ -95,6 +95,93 @@ fn admission_distinguishes_authorization_dependency_failure() {
 }
 
 #[test]
+fn authorization_denial_covers_every_published_calendar_action() {
+    let identity = identity("tenant-a");
+
+    let mut create_collection = AuthorizedCalendarService::new(
+        StubAuthorization::deny(CalendarAction::CreateCollection),
+        InMemoryCalendarService::new(),
+    );
+    assert_eq!(
+        create_collection.create_collection(&identity, "Customer calendar"),
+        Err(CalendarError::Unauthorized)
+    );
+
+    let mut create_event = AuthorizedCalendarService::new(
+        StubAuthorization::deny(CalendarAction::CreateEvent),
+        InMemoryCalendarService::new(),
+    );
+    assert_eq!(
+        create_event.create_event(&identity, "missing-collection", "not an iCalendar payload"),
+        Err(CalendarError::Unauthorized)
+    );
+
+    let read_events = AuthorizedCalendarService::new(
+        StubAuthorization::deny(CalendarAction::ReadEvents),
+        InMemoryCalendarService::new(),
+    );
+    assert_eq!(
+        read_events.list_events(&identity, "missing-collection"),
+        Err(CalendarError::Unauthorized)
+    );
+    assert_eq!(
+        read_events.get_event(&identity, "missing-collection", "missing-event"),
+        Err(CalendarError::Unauthorized)
+    );
+
+    let mut update_event = AuthorizedCalendarService::new(
+        StubAuthorization::deny(CalendarAction::UpdateEvent),
+        InMemoryCalendarService::new(),
+    );
+    assert_eq!(
+        update_event.update_event(
+            &identity,
+            "missing-collection",
+            "missing-event",
+            "\"missing:1\"",
+            "not an iCalendar payload",
+        ),
+        Err(CalendarError::Unauthorized)
+    );
+}
+
+#[test]
+fn authorization_unavailability_covers_every_published_calendar_action() {
+    let identity = identity("tenant-a");
+    let mut service = AuthorizedCalendarService::new(
+        StubAuthorization::unavailable(),
+        InMemoryCalendarService::new(),
+    );
+
+    assert_eq!(
+        service.create_collection(&identity, "Customer calendar"),
+        Err(CalendarError::AuthorizationUnavailable)
+    );
+    assert_eq!(
+        service.create_event(&identity, "missing-collection", "not an iCalendar payload"),
+        Err(CalendarError::AuthorizationUnavailable)
+    );
+    assert_eq!(
+        service.list_events(&identity, "missing-collection"),
+        Err(CalendarError::AuthorizationUnavailable)
+    );
+    assert_eq!(
+        service.get_event(&identity, "missing-collection", "missing-event"),
+        Err(CalendarError::AuthorizationUnavailable)
+    );
+    assert_eq!(
+        service.update_event(
+            &identity,
+            "missing-collection",
+            "missing-event",
+            "\"missing:1\"",
+            "not an iCalendar payload",
+        ),
+        Err(CalendarError::AuthorizationUnavailable)
+    );
+}
+
+#[test]
 fn scoped_identity_validation_is_bounded_and_opaque() {
     let tenant = TenantId::parse("tenant-a").expect("tenant fixture is valid");
     assert!(
