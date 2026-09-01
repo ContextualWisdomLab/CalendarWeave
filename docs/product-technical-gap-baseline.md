@@ -25,6 +25,7 @@ The primary product risk is therefore not missing UI polish. It is **authority a
 | Gap | Owner path | Status / acceptance |
 | --- | --- | --- |
 | CalendarWeave has architecture but no executable calendar core | CalendarWeave #2 | Build real collection + VEVENT create/list/get with versioned port, RFC fixtures, tenant/security tests and 100% statement/branch coverage |
+| Calendar Resource Core v1 candidate is non-durable | CalendarWeave #2 / ADR-0002 | Candidate application port covers collection plus strict VEVENT create/list/get with 100% line/branch coverage; add durable concurrency-safe storage and authorization admission before release or consumer migration |
 | Naruon currently owns Google Calendar SDK/iCalendar mechanics in generic service paths | Naruon #978 and #1508 | Preserve Naruon commitment policy; introduce CalendarPort/ACL after CalendarWeave release; migrate generic provider/protocol responsibility only after parity |
 | `saju-caldav` currently owns Radicale/CalDAV platform responsibility | saju-caldav #43 | Characterize current behavior, add CalendarWeave publisher port, prove parity, then remove generic CalDAV platform ownership |
 | LineageWeave merged compatibility projection names Naruon as calendar authority | LineageWeave #900 | Keep compatibility v1 until CalendarWeave read contract exists; later consume CalendarWeave observations and Naruon decision evidence as separate typed sources |

@@ -11,3 +11,23 @@ Standalone CalDAV/iCalendar PIMS. Open this repo when you need calendar as its o
 ## What this is not
 
 Not mail. Not tasks. Not a local IdP. Not GRC policy. Not LineageWeave #74.
+
+## Current executable candidate
+
+The branch stacked above architecture PR #1 contains a Rust v0.1 application
+port for tenant-scoped collection creation and strict RFC 5545 VEVENT
+create/list/get. It accepts UTC or all-day intervals and returns opaque event
+references with revision/ETag evidence. Unsupported calendar capabilities fail
+closed.
+
+This is an in-memory conformance adapter, not protected-main, durable storage,
+CalDAV, a deployed service, or a released migration contract. See ADR 0002.
+
+```bash
+cargo fmt --check
+cargo clippy --all-targets --all-features -- -D warnings
+cargo test --all-features
+cargo +nightly llvm-cov --all-features --branch \
+  --fail-under-lines 100 --json --output-path coverage.json
+jq -e '.data[0].totals.branches.percent == 100' coverage.json
+```
