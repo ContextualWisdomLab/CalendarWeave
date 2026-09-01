@@ -1,15 +1,16 @@
 use calendarweave::admission::{
     AuthorizationError, AuthorizedCalendarService, CalendarAction, CalendarAuthorizationPort,
-    ScopedIdentity,
+    CalendarAuthorizationRequest, ExternalIdentity,
 };
 use calendarweave::{CalendarError, InMemoryCalendarService, TenantId};
 
 const EVENT: &str = "BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//ContextualWisdomLab//CalendarWeave Test//EN\r\nBEGIN:VEVENT\r\nUID:event-1@example.test\r\nDTSTAMP:20260901T000000Z\r\nDTSTART:20260902T090000Z\r\nDTEND:20260902T100000Z\r\nSUMMARY:Customer planning session\r\nEND:VEVENT\r\nEND:VCALENDAR\r\n";
 const UPDATED_EVENT: &str = "BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//ContextualWisdomLab//CalendarWeave Test//EN\r\nBEGIN:VEVENT\r\nUID:event-1@example.test\r\nDTSTAMP:20260901T000000Z\r\nDTSTART:20260902T090000Z\r\nDTEND:20260902T100000Z\r\nSUMMARY:Updated customer planning session\r\nEND:VEVENT\r\nEND:VCALENDAR\r\n";
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Debug)]
 struct StubAuthorization {
     denied_action: Option<CalendarAction>,
+    denied_collection_ref: Option<String>,
     unavailable: bool,
 }
 
@@ -17,6 +18,7 @@ impl StubAuthorization {
     fn allow_all() -> Self {
         Self {
             denied_action: None,
+            denied_collection_ref: None,
             unavailable: false,
         }
     }
@@ -24,6 +26,15 @@ impl StubAuthorization {
     fn deny(action: CalendarAction) -> Self {
         Self {
             denied_action: Some(action),
+            denied_collection_ref: None,
+            unavailable: false,
+        }
+    }
+
+    fn deny_collection(action: CalendarAction, collection_ref: &str) -> Self {
+        Self {
+            denied_action: Some(action),
+            denied_collection_ref: Some(collection_ref.to_owned()),
             unavailable: false,
         }
     }
@@ -31,6 +42,7 @@ impl StubAuthorization {
     fn unavailable() -> Self {
         Self {
             denied_action: None,
+            denied_collection_ref: None,
             unavailable: true,
         }
     }
@@ -39,29 +51,33 @@ impl StubAuthorization {
 impl CalendarAuthorizationPort for StubAuthorization {
     fn authorize(
         &self,
-        identity: &ScopedIdentity,
-        action: CalendarAction,
-    ) -> Result<(), AuthorizationError> {
+        identity: &ExternalIdentity,
+        request: &CalendarAuthorizationRequest<'_>,
+    ) -> Result<TenantId, AuthorizationError> {
         assert_eq!(identity.issuer(), "https://identity.example.test");
-        assert_eq!(identity.subject(), "customer-user-01");
-        let _tenant_scope = identity.tenant_id();
         if self.unavailable {
             return Err(AuthorizationError::Unavailable);
         }
-        if self.denied_action == Some(action) {
+        if self.denied_action == Some(request.action())
+            && self
+                .denied_collection_ref
+                .as_deref()
+                .is_none_or(|expected| request.collection_ref() == Some(expected))
+        {
             return Err(AuthorizationError::Denied);
         }
-        Ok(())
+        let tenant = match identity.subject() {
+            "customer-user-01" => "tenant-a",
+            "customer-user-02" => "tenant-b",
+            _ => return Err(AuthorizationError::Denied),
+        };
+        TenantId::parse(tenant).map_err(|_| AuthorizationError::Unavailable)
     }
 }
 
-fn identity(tenant: &str) -> ScopedIdentity {
-    ScopedIdentity::parse(
-        "https://identity.example.test",
-        "customer-user-01",
-        TenantId::parse(tenant).expect("tenant fixture is valid"),
-    )
-    .expect("identity fixture is valid")
+fn identity(subject: &str) -> ExternalIdentity {
+    ExternalIdentity::parse("https://identity.example.test", subject)
+        .expect("identity fixture is valid")
 }
 
 #[test]
@@ -70,13 +86,10 @@ fn admission_denies_before_parsing_untrusted_calendar_payload() {
         StubAuthorization::deny(CalendarAction::CreateEvent),
         InMemoryCalendarService::new(),
     );
-    let identity = identity("tenant-a");
-    let collection = service
-        .create_collection(&identity, "Customer calendar")
-        .expect("collection creation is authorized");
+    let identity = identity("customer-user-01");
 
     assert_eq!(
-        service.create_event(&identity, &collection.collection_ref, "not an iCalendar payload"),
+        service.create_event(&identity, "missing-collection", "not an iCalendar payload"),
         Err(CalendarError::Unauthorized)
     );
 }
@@ -89,14 +102,14 @@ fn admission_distinguishes_authorization_dependency_failure() {
     );
 
     assert_eq!(
-        service.create_collection(&identity("tenant-a"), "Customer calendar"),
+        service.create_collection(&identity("customer-user-01"), "Customer calendar"),
         Err(CalendarError::AuthorizationUnavailable)
     );
 }
 
 #[test]
 fn authorization_denial_covers_every_published_calendar_action() {
-    let identity = identity("tenant-a");
+    let identity = identity("customer-user-01");
 
     let mut create_collection = AuthorizedCalendarService::new(
         StubAuthorization::deny(CalendarAction::CreateCollection),
@@ -147,7 +160,7 @@ fn authorization_denial_covers_every_published_calendar_action() {
 
 #[test]
 fn authorization_unavailability_covers_every_published_calendar_action() {
-    let identity = identity("tenant-a");
+    let identity = identity("customer-user-01");
     let mut service = AuthorizedCalendarService::new(
         StubAuthorization::unavailable(),
         InMemoryCalendarService::new(),
@@ -182,59 +195,94 @@ fn authorization_unavailability_covers_every_published_calendar_action() {
 }
 
 #[test]
-fn scoped_identity_validation_is_bounded_and_opaque() {
-    let tenant = TenantId::parse("tenant-a").expect("tenant fixture is valid");
-    assert!(
-        ScopedIdentity::parse(
-            "https://identity.example.test",
-            "subject with spaces",
-            tenant.clone()
-        )
-        .is_ok()
+fn resource_context_reaches_authorization_before_domain_lookup() {
+    let identity = identity("customer-user-01");
+    let service = AuthorizedCalendarService::new(
+        StubAuthorization::deny_collection(CalendarAction::ReadEvents, "restricted-collection"),
+        InMemoryCalendarService::new(),
+    );
+
+    assert_eq!(
+        service.list_events(&identity, "restricted-collection"),
+        Err(CalendarError::Unauthorized)
     );
     assert_eq!(
-        ScopedIdentity::parse("", "subject-01", tenant.clone()),
+        service.get_event(&identity, "restricted-collection", "event-1"),
+        Err(CalendarError::Unauthorized)
+    );
+    assert_eq!(
+        service.list_events(&identity, "different-missing-collection"),
+        Err(CalendarError::NotFound)
+    );
+}
+
+#[test]
+fn authorization_request_exposes_exact_resource_context() {
+    let mut service = AuthorizedCalendarService::new(
+        InspectingAuthorization,
+        InMemoryCalendarService::new(),
+    );
+    let identity = identity("customer-user-01");
+
+    assert_eq!(
+        service.update_event(
+            &identity,
+            "calendar-123",
+            "event-456",
+            "\"event-456:1\"",
+            "not an iCalendar payload",
+        ),
+        Err(CalendarError::NotFound)
+    );
+}
+
+#[derive(Clone, Copy, Debug)]
+struct InspectingAuthorization;
+
+impl CalendarAuthorizationPort for InspectingAuthorization {
+    fn authorize(
+        &self,
+        _identity: &ExternalIdentity,
+        request: &CalendarAuthorizationRequest<'_>,
+    ) -> Result<TenantId, AuthorizationError> {
+        assert_eq!(request.action(), CalendarAction::UpdateEvent);
+        assert_eq!(request.collection_ref(), Some("calendar-123"));
+        assert_eq!(request.event_ref(), Some("event-456"));
+        TenantId::parse("tenant-a").map_err(|_| AuthorizationError::Unavailable)
+    }
+}
+
+#[test]
+fn external_identity_validation_is_bounded_and_opaque() {
+    assert!(ExternalIdentity::parse("https://identity.example.test", "subject with spaces").is_ok());
+    assert_eq!(
+        ExternalIdentity::parse("", "subject-01"),
         Err(CalendarError::InvalidInput)
     );
     assert_eq!(
-        ScopedIdentity::parse(
-            "https://identity.example.test",
-            "",
-            tenant.clone()
-        ),
+        ExternalIdentity::parse("https://identity.example.test", ""),
         Err(CalendarError::InvalidInput)
     );
     assert_eq!(
-        ScopedIdentity::parse(
-            "https://identity.example.test",
-            &"s".repeat(513),
-            tenant.clone()
-        ),
+        ExternalIdentity::parse("https://identity.example.test", &"s".repeat(513)),
         Err(CalendarError::InvalidInput)
     );
     assert_eq!(
-        ScopedIdentity::parse(
-            "https://identity.example.test",
-            "subject\u{0000}bad",
-            tenant
-        ),
+        ExternalIdentity::parse("https://identity.example.test", "subject\u{0000}bad"),
         Err(CalendarError::InvalidInput)
     );
 }
 
 #[test]
 fn issuer_and_subject_jointly_identify_the_external_principal() {
-    let tenant = TenantId::parse("tenant-a").expect("tenant fixture is valid");
-    let first = ScopedIdentity::parse(
+    let first = ExternalIdentity::parse(
         "https://identity.example.test",
         "customer-user-01",
-        tenant.clone(),
     )
     .expect("identity fixture is valid");
-    let second = ScopedIdentity::parse(
+    let second = ExternalIdentity::parse(
         "https://other-identity.example.test",
         "customer-user-01",
-        tenant,
     )
     .expect("identity fixture is valid");
 
@@ -242,26 +290,30 @@ fn issuer_and_subject_jointly_identify_the_external_principal() {
 }
 
 #[test]
-fn admitted_operations_stay_bound_to_the_identity_tenant() {
+fn authorized_tenant_is_derived_by_the_policy_adapter_not_the_caller() {
     let mut service = AuthorizedCalendarService::new(
         StubAuthorization::allow_all(),
         InMemoryCalendarService::new(),
     );
-    let tenant_a = identity("tenant-a");
-    let tenant_b = identity("tenant-b");
+    let tenant_a_identity = identity("customer-user-01");
+    let tenant_b_identity = identity("customer-user-02");
     let collection = service
-        .create_collection(&tenant_a, "Customer calendar")
+        .create_collection(&tenant_a_identity, "Customer calendar")
         .expect("collection creation succeeds");
     let created = service
-        .create_event(&tenant_a, &collection.collection_ref, EVENT)
+        .create_event(&tenant_a_identity, &collection.collection_ref, EVENT)
         .expect("event creation succeeds");
 
     assert_eq!(
-        service.get_event(&tenant_b, &collection.collection_ref, &created.event_ref),
+        service.get_event(
+            &tenant_b_identity,
+            &collection.collection_ref,
+            &created.event_ref,
+        ),
         Err(CalendarError::NotFound)
     );
     assert_eq!(
-        service.list_events(&tenant_b, &collection.collection_ref),
+        service.list_events(&tenant_b_identity, &collection.collection_ref),
         Err(CalendarError::NotFound)
     );
 }
@@ -272,7 +324,7 @@ fn admitted_crud_preserves_calendar_port_revision_contract() {
         StubAuthorization::allow_all(),
         InMemoryCalendarService::new(),
     );
-    let identity = identity("tenant-a");
+    let identity = identity("customer-user-01");
     let collection = service
         .create_collection(&identity, "Customer calendar")
         .expect("collection creation succeeds");
