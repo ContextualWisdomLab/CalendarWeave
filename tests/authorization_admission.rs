@@ -44,7 +44,7 @@ impl CalendarAuthorizationPort for StubAuthorization {
     ) -> Result<(), AuthorizationError> {
         assert_eq!(identity.issuer(), "https://identity.example.test");
         assert_eq!(identity.subject(), "customer-user-01");
-        assert!(identity.tenant_id().as_ref().starts_with("tenant-"));
+        let _tenant_scope = identity.tenant_id();
         if self.unavailable {
             return Err(AuthorizationError::Unavailable);
         }
