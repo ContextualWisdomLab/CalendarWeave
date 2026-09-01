@@ -9,4 +9,6 @@
 - Preserve standard confirmed, tentative, and cancelled VEVENT status without importing consumer conflict policy.
 - Add tenant-safe strong-ETag conditional update with immutable UID and authorization-before-parse error ordering.
 - Fail closed for malformed, cross-tenant, stale-revision, and unsupported calendar requests with 100% owned line and branch coverage.
-- Next: advance the executable candidate through durable persistence, timezone/interval parity, authentication, operated recovery, versioned release evidence, and consumer migration gates.
+- Replace the repository-local floating `ubuntu-latest` selectors with explicit `ubuntu-24.04` after the same hosted-runner starvation signature proven by central `.github` #1618; add a permanent regression requiring both Rust and coverage jobs to keep the explicit image. The repaired exact predecessor head acquired runners and completed both jobs successfully.
+- Refresh the product/technical gap baseline from the live stack: executable core, durable PostgreSQL and bounded IANA timezone candidates are distinguished from protected-main/release evidence, while authorization, recovery, RFC/CalDAV, privacy, packaging and consumer migration remain open.
+- Next: advance the candidate stack through current-head semantic review, external authorization, operated recovery, standards-backed calendar capability, versioned release evidence, and consumer migration gates.
