@@ -14,9 +14,12 @@ admission ACL around the Calendar Resource Core: it consumes externally verified
 issuer/subject evidence with no caller-selected tenant, presents the exact action
 and resource references to an external authorization port, and uses only the
 authorization-derived tenant when delegating to the core. Authorization precedes
-calendar parsing. None changes the protected-main, service-authentication,
-CalDAV, deployment, backup-operation, or consumer-migration evidence boundary
-above.
+calendar parsing. The stacked ADR-0006 candidate adds a PostgreSQL logical
+backup/restore operation with private artifacts, checksum-before-restore and an
+executable invariant recovery drill. These remain candidate evidence rather than
+protected-main or released-product evidence; ADR-0006 specifically does not
+claim an operated RPO/RTO, WAL/PITR, HA/failover, service authentication,
+CalDAV deployment, or consumer migration.
 
 ## Product responsibility
 
@@ -87,6 +90,7 @@ CalendarWeave does not interpret or calculate Four Pillars. `four-pillars` remai
 | Identity, federation and external authorization policy | Keyverse | CalendarWeave consumes verified issuer/subject identity and resource-aware policy decisions through an ACL |
 | iCalendar / CalDAV protocol semantics | CalendarWeave | Consumer products use ports/adapters |
 | Provider calendar sync and revision receipts | CalendarWeave | Consumer-specific authorization intent remains with consumer |
+| PostgreSQL logical recovery operation | CalendarWeave | ADR-0006 / PR #7 candidate proves digest-verified logical restore; deployment owns backup store, keys, cadence, RPO/RTO and WAL/PITR/HA |
 | Workspace commitment/conflict decision | Naruon | References CalendarWeave event/resource evidence |
 | Mail/thread evidence | Naruon + ThreadWeave boundary | CalendarWeave receives no mail authority |
 | Lineage/ontology interpretation | LineageWeave | Calendar references only |
@@ -104,6 +108,7 @@ CalendarWeave does not interpret or calculate Four Pillars. `four-pillars` remai
 - Event create idempotency is collection + RFC UID; updates preserve immutable UID and advance one revision only under the expected ETag.
 - A denied or unavailable authorization decision cannot become parser, storage or mutation authority.
 - A caller-provided tenant string cannot become authorization authority; the tenant used by the core is derived by the trusted authorization decision for the exact request.
+- Backup/restore tooling is an operations boundary outside ordinary aggregate transactions. Restore verifies artifact integrity before opening one dedicated recovery transaction and then proves the same relational invariants rather than redefining them.
 
 ## Migration invariant
 
@@ -133,7 +138,9 @@ The executable PostgreSQL candidate uses the singular multiword equivalents `cal
 
 Fail closed without purpose-limited identity and authorization. Consume Keyverse through an infrastructure ACL; do not stand up a local IdP or treat an arbitrary tenant string as proof of permission. `ExternalIdentity` carries only verified issuer/subject evidence. The authorization adapter evaluates the exact action/resource request and derives the tenant used by the core. Authorization precedes parsing and mutation at the application boundary. Necessary attendee/organizer data remains usable under least privilege, tenant/purpose isolation, encryption, retention and access/export audit rather than blanket masking. Provider credentials, raw Authorization data and bearer tokens are never domain attributes or ordinary telemetry.
 
-The current ADR-0005 candidate proves only an in-process admission contract. HTTP/service authentication, token verification, durable authorization/audit evidence, rate limiting, production Keyverse integration, CSAP/SOC 2 operational evidence, and released interoperability remain open.
+Calendar backup artifacts can contain the same necessary calendar PII. ADR-0006 therefore protects logical backup artifacts with owner-only file permissions and verifies their digest before restore; it does not mask data in a way that would make recovery unusable. Production storage encryption, access policy, retention, key management and remote durability remain explicit deployment gates.
+
+The current ADR-0005 candidate proves only an in-process admission contract. HTTP/service authentication, token verification, durable authorization/audit evidence, rate limiting, production Keyverse integration, CSAP/SOC 2 operational evidence, and released interoperability remain open. ADR-0006 similarly proves only a bounded logical recovery operation, not PITR, HA or an operated disaster-recovery objective.
 
 ## Citations
 
