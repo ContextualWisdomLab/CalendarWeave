@@ -36,9 +36,11 @@ The implementation stack is building a tenant-scoped Calendar Resource Core, dur
 
 ### Executable candidate evidence
 
-The implementation branch stacked on the architecture baseline contains a Rust v0.1 application port for tenant-scoped collection creation and strict RFC 5545 VEVENT create, conditional-update, list, and get behavior. It accepts UTC or all-day intervals, preserves standard event status, returns opaque event references with revision/ETag evidence, checks authorization scope before parsing payloads, and fails closed for malformed, cross-tenant, stale-revision, and unsupported requests.
+The implementation stack contains a Rust v0.1 application port for tenant-scoped collection creation and strict RFC 5545 VEVENT create, conditional-update, list, and get behavior. It accepts UTC or all-day intervals, preserves standard event status, returns opaque event references with revision/ETag evidence, checks authorization scope before parsing payloads, and fails closed for malformed, cross-tenant, stale-revision, and unsupported requests.
 
-That executable candidate is conformance evidence only. It is not protected-main, a released package or service, durable storage by itself, a CalDAV endpoint, provider parity, or a consumer migration contract.
+The durable-store slice adds a 3NF PostgreSQL adapter with restart-stable event identity, append-only revisions, item-level create idempotency by collection plus RFC UID, and row-locked strong-ETag updates. That is candidate evidence, not an operated backup/recovery claim.
+
+These executable candidates are not protected-main, a released package or service, a CalDAV endpoint, provider parity, or a consumer migration contract.
 
 ## First releasable vertical
 
