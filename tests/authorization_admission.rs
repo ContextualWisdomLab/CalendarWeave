@@ -39,9 +39,12 @@ impl StubAuthorization {
 impl CalendarAuthorizationPort for StubAuthorization {
     fn authorize(
         &self,
-        _identity: &ScopedIdentity,
+        identity: &ScopedIdentity,
         action: CalendarAction,
     ) -> Result<(), AuthorizationError> {
+        assert_eq!(identity.issuer(), "https://identity.example.test");
+        assert_eq!(identity.subject(), "customer-user-01");
+        assert!(identity.tenant_id().as_ref().starts_with("tenant-"));
         if self.unavailable {
             return Err(AuthorizationError::Unavailable);
         }
@@ -54,7 +57,8 @@ impl CalendarAuthorizationPort for StubAuthorization {
 
 fn identity(tenant: &str) -> ScopedIdentity {
     ScopedIdentity::parse(
-        "subject:customer-user-01",
+        "https://identity.example.test",
+        "customer-user-01",
         TenantId::parse(tenant).expect("tenant fixture is valid"),
     )
     .expect("identity fixture is valid")
@@ -93,19 +97,61 @@ fn admission_distinguishes_authorization_dependency_failure() {
 #[test]
 fn scoped_identity_validation_is_bounded_and_opaque() {
     let tenant = TenantId::parse("tenant-a").expect("tenant fixture is valid");
-    assert!(ScopedIdentity::parse("subject-01", tenant.clone()).is_ok());
+    assert!(
+        ScopedIdentity::parse(
+            "https://identity.example.test",
+            "subject with spaces",
+            tenant.clone()
+        )
+        .is_ok()
+    );
     assert_eq!(
-        ScopedIdentity::parse("", tenant.clone()),
+        ScopedIdentity::parse("", "subject-01", tenant.clone()),
         Err(CalendarError::InvalidInput)
     );
     assert_eq!(
-        ScopedIdentity::parse(&"s".repeat(257), tenant.clone()),
+        ScopedIdentity::parse(
+            "https://identity.example.test",
+            "",
+            tenant.clone()
+        ),
         Err(CalendarError::InvalidInput)
     );
     assert_eq!(
-        ScopedIdentity::parse("subject with spaces", tenant),
+        ScopedIdentity::parse(
+            "https://identity.example.test",
+            &"s".repeat(513),
+            tenant.clone()
+        ),
         Err(CalendarError::InvalidInput)
     );
+    assert_eq!(
+        ScopedIdentity::parse(
+            "https://identity.example.test",
+            "subject\u{0000}bad",
+            tenant
+        ),
+        Err(CalendarError::InvalidInput)
+    );
+}
+
+#[test]
+fn issuer_and_subject_jointly_identify_the_external_principal() {
+    let tenant = TenantId::parse("tenant-a").expect("tenant fixture is valid");
+    let first = ScopedIdentity::parse(
+        "https://identity.example.test",
+        "customer-user-01",
+        tenant.clone(),
+    )
+    .expect("identity fixture is valid");
+    let second = ScopedIdentity::parse(
+        "https://other-identity.example.test",
+        "customer-user-01",
+        tenant,
+    )
+    .expect("identity fixture is valid");
+
+    assert_ne!(first, second);
 }
 
 #[test]
