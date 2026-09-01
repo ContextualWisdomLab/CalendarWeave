@@ -1,0 +1,39 @@
+name: Tests
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  rust:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+      - uses: dtolnay/rust-toolchain@032958afbdc797a9164d3bc0b56325c1308924a5
+        with:
+          toolchain: 1.97.1
+          components: clippy,rustfmt
+      - run: cargo fmt --check
+      - run: cargo clippy --all-targets --all-features -- -D warnings
+      - run: cargo test --all-features
+      - run: cargo doc --all-features --no-deps
+
+  coverage:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+      - uses: dtolnay/rust-toolchain@7c8d7d138f5c09cef361f8214cf96882cd029cdb
+        with:
+          toolchain: nightly
+          components: llvm-tools-preview
+      - uses: taiki-e/install-action@1ee706eb04986370fc60419ba172594c51067f29 # v2.62.58
+        with:
+          tool: cargo-llvm-cov@0.8.6
+      - run: >-
+          cargo llvm-cov --all-features --branch
+          --fail-under-lines 100 --json --output-path coverage.json
+      - run: jq -e '.data[0].totals.branches.percent == 100' coverage.json
