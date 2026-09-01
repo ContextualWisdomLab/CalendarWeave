@@ -123,6 +123,22 @@ pub trait CalendarPort {
         icalendar: &str,
     ) -> Result<CalendarEvent, CalendarError>;
 
+    /// Replace one event only when the caller presents its current strong `ETag`.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`CalendarError::NotFound`] for absent or cross-tenant resources,
+    /// [`CalendarError::StaleRevision`] for a stale `ETag`, and a bounded input
+    /// error when the replacement is malformed or changes the immutable UID.
+    fn update_event(
+        &mut self,
+        tenant_id: &TenantId,
+        collection_ref: &str,
+        event_ref: &str,
+        if_match: &str,
+        icalendar: &str,
+    ) -> Result<CalendarEvent, CalendarError>;
+
     /// List authorized event revisions without exposing another tenant.
     ///
     /// # Errors
@@ -226,8 +242,8 @@ impl CalendarPort for InMemoryCalendarService {
         collection_ref: &str,
         icalendar: &str,
     ) -> Result<CalendarEvent, CalendarError> {
-        let parsed = parse_event(icalendar)?;
         let record = self.collection_mut(tenant_id, collection_ref)?;
+        let parsed = parse_event(icalendar)?;
         if let Some(event_ref) = record.event_ref_by_uid.get(&parsed.uid) {
             let existing = &record.events[event_ref];
             return if existing.icalendar == icalendar {
@@ -252,6 +268,48 @@ impl CalendarPort for InMemoryCalendarService {
             .insert(parsed.uid, event_ref.clone());
         record.events.insert(event_ref, event.clone());
         Ok(event)
+    }
+
+    fn update_event(
+        &mut self,
+        tenant_id: &TenantId,
+        collection_ref: &str,
+        event_ref: &str,
+        if_match: &str,
+        icalendar: &str,
+    ) -> Result<CalendarEvent, CalendarError> {
+        let record = self.collection_mut(tenant_id, collection_ref)?;
+        let existing = record
+            .events
+            .get(event_ref)
+            .cloned()
+            .ok_or(CalendarError::NotFound)?;
+        if existing.etag != if_match {
+            return Err(CalendarError::StaleRevision);
+        }
+        let parsed = parse_event(icalendar)?;
+        if parsed.uid != existing.uid {
+            return Err(CalendarError::InvalidInput);
+        }
+        if existing.icalendar == icalendar {
+            return Ok(existing);
+        }
+        let revision = existing
+            .revision
+            .checked_add(1)
+            .ok_or(CalendarError::StaleRevision)?;
+        let updated = CalendarEvent {
+            event_ref: existing.event_ref,
+            collection_ref: existing.collection_ref,
+            uid: existing.uid,
+            summary: parsed.summary,
+            status: parsed.status,
+            revision,
+            etag: format!("\"{event_ref}:{revision}\""),
+            icalendar: icalendar.to_owned(),
+        };
+        record.events.insert(event_ref.to_owned(), updated.clone());
+        Ok(updated)
     }
 
     fn list_events(

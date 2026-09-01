@@ -16,7 +16,7 @@ Not mail. Not tasks. Not a local IdP. Not GRC policy. Not LineageWeave #74.
 
 The branch stacked above architecture PR #1 contains a Rust v0.1 application
 port for tenant-scoped collection creation and strict RFC 5545 VEVENT
-create/list/get. It accepts UTC or all-day intervals and returns opaque event
+create/conditional-update/list/get. It accepts UTC or all-day intervals and returns opaque event
 references with revision/ETag evidence. Unsupported calendar capabilities fail
 closed.
 

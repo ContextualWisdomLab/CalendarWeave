@@ -112,6 +112,90 @@ fn cross_tenant_access_is_indistinguishable_from_an_unknown_collection() {
         service.get_event(&outsider, &collection.collection_ref, &event.event_ref),
         Err(CalendarError::NotFound)
     );
+    assert_eq!(
+        service.create_event(&outsider, &collection.collection_ref, "not iCalendar"),
+        Err(CalendarError::NotFound)
+    );
+    assert_eq!(
+        service.update_event(
+            &outsider,
+            &collection.collection_ref,
+            &event.event_ref,
+            &event.etag,
+            "not iCalendar",
+        ),
+        Err(CalendarError::NotFound)
+    );
+}
+
+#[test]
+fn conditional_update_is_idempotent_and_rejects_stale_writers() {
+    let tenant = tenant("synthetic-tenant-a");
+    let mut service = InMemoryCalendarService::new();
+    let collection = service
+        .create_collection(&tenant, "Synthetic calendar")
+        .unwrap();
+    let created = service
+        .create_event(&tenant, &collection.collection_ref, UTC_EVENT)
+        .unwrap();
+    let changed_payload =
+        UTC_EVENT.replace("Synthetic planning review", "Synthetic revised review");
+
+    let updated = service
+        .update_event(
+            &tenant,
+            &collection.collection_ref,
+            &created.event_ref,
+            &created.etag,
+            &changed_payload,
+        )
+        .unwrap();
+    assert_eq!(updated.event_ref, created.event_ref);
+    assert_eq!(updated.revision, 2);
+    assert_ne!(updated.etag, created.etag);
+    assert_eq!(updated.summary, "Synthetic revised review");
+    assert_eq!(
+        service.update_event(
+            &tenant,
+            &collection.collection_ref,
+            &created.event_ref,
+            &created.etag,
+            &changed_payload,
+        ),
+        Err(CalendarError::StaleRevision)
+    );
+    assert_eq!(
+        service
+            .update_event(
+                &tenant,
+                &collection.collection_ref,
+                &updated.event_ref,
+                &updated.etag,
+                &changed_payload,
+            )
+            .unwrap(),
+        updated
+    );
+    assert_eq!(
+        service.update_event(
+            &tenant,
+            &collection.collection_ref,
+            &updated.event_ref,
+            &updated.etag,
+            &changed_payload.replace("synthetic-event-1", "synthetic-event-2"),
+        ),
+        Err(CalendarError::InvalidInput)
+    );
+    assert_eq!(
+        service.update_event(
+            &tenant,
+            &collection.collection_ref,
+            &updated.event_ref,
+            &updated.etag,
+            "not iCalendar",
+        ),
+        Err(CalendarError::MalformedCalendar)
+    );
 }
 
 #[test]
@@ -229,6 +313,16 @@ fn unknown_resources_and_owner_resources_share_not_found() {
     );
     assert_eq!(
         service.create_event(&tenant, "cal_unknown", UTC_EVENT),
+        Err(CalendarError::NotFound)
+    );
+    assert_eq!(
+        service.update_event(
+            &tenant,
+            &collection.collection_ref,
+            "evt_unknown",
+            "\"evt_unknown:1\"",
+            UTC_EVENT,
+        ),
         Err(CalendarError::NotFound)
     );
 }

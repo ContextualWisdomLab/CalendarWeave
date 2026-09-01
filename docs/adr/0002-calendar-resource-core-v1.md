@@ -16,7 +16,7 @@ service operation.
 
 CalendarWeave v0.1 introduces a Rust library application port with an
 in-process reference adapter. The port creates a tenant-owned calendar
-collection and creates, lists, or gets immutable event revisions through
+collection and creates, conditionally updates, lists, or gets event revisions through
 opaque collection and event references. Every lookup includes the tenant
 scope; an unknown resource and another tenant's resource both return the same
 `NotFound` outcome.
@@ -32,12 +32,19 @@ The accepted RFC 5545 profile is deliberately narrow:
 - CRLF input and preserved validated source representation;
 - identical repeated create by collection plus UID is idempotent;
 - changed content for an existing UID fails as `StaleRevision` rather than
-  overwriting evidence.
+  overwriting evidence;
+- update preserves the event reference and UID, requires the current strong
+  ETag, increments the revision only for changed content, and rejects a stale
+  writer before parsing its replacement payload.
+
+Collection and event authorization precedes payload parsing. An unauthorized
+caller therefore receives the same `NotFound` result for valid and malformed
+payloads and cannot infer another tenant's resource from parser error detail.
 
 CalendarWeave does not decide whether a cancelled or tentative event occupies
 time; that remains consumer conflict policy. TZID/floating time, recurrence,
 attendees, alarms, scheduling, provider
-mapping, sync, update/delete, and CalDAV/WebDAV are unavailable capabilities.
+mapping, sync, delete, and CalDAV/WebDAV are unavailable capabilities.
 The parser rejects them explicitly instead of silently discarding fields.
 
 The application port is the consumer contract. The in-memory adapter is an
@@ -62,7 +69,8 @@ documentation checks. A separately pinned nightly coverage job measures LLVM
 branch coverage and requires 100% lines and branches; this does not change the
 production compiler pin. Synthetic RFC fixtures cover tenant denial, malformed
 input, unsupported capabilities, duplicate singleton rejection, UTC and
-all-day intervals, idempotency, and stale revision behavior.
+all-day intervals, idempotency, tenant-safe error ordering, and stale
+conditional-write behavior.
 
 ## Consequences
 

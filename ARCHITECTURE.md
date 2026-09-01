@@ -5,7 +5,8 @@
 This document defines the accepted target boundary for CalendarWeave. Protected `main` is still a seed repository and does **not** yet implement the CalDAV/iCalendar PIMS described here. Until CalendarWeave has a versioned production contract and parity evidence, existing consumer-side calendar implementations remain compatibility paths rather than evidence that CalendarWeave is already the system of record.
 
 The ADR-0002 candidate adds only an executable Rust application port and
-in-memory conformance adapter for collection plus strict VEVENT create/list/get.
+in-memory conformance adapter for collection plus strict VEVENT
+create/conditional-update/list/get.
 It does not change the protected-main, durability, CalDAV, deployment, or
 consumer-migration evidence boundary above.
 

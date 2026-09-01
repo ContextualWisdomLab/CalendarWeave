@@ -8,5 +8,7 @@
   tenant-scoped collection and strict VEVENT create/list/get behavior.
 - Preserve standard confirmed, tentative, and cancelled VEVENT status without
   importing consumer conflict policy.
+- Add tenant-safe strong-ETag conditional update with immutable UID and
+  authorization-before-parse error ordering.
 - Fail closed for malformed, cross-tenant, stale-revision, and unsupported
   calendar requests with 100% owned line and branch coverage.
