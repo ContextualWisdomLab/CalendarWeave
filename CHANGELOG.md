@@ -11,4 +11,6 @@
 - Add a PostgreSQL 3NF persistence candidate with restart-stable item-level create idempotency, append-only revisions, and serialized ETag concurrency.
 - Validate bounded matching IANA `TZID` intervals through the shared parser, rejecting unknown, mixed, mismatched, ambiguous, nonexistent, and non-increasing local-time intervals.
 - Fail closed for malformed, cross-tenant, stale-revision, and unsupported calendar requests with 100% owned line and branch coverage.
+- Replace repository-local `ubuntu-latest` selectors with explicit `ubuntu-24.04`, preserving PostgreSQL service coverage, after the same hosted-runner starvation signature proven by central `.github` #1618; add a permanent two-job selector regression.
+- Refresh the product/technical gap baseline from live architecture, implementation, persistence, time-semantics, review-control and operability evidence without promoting candidate branches to shipped evidence.
 - Next: add standards-backed `DURATION`/`VTIMEZONE` capability slices, external authorization admission, operated backup/recovery, versioned release evidence, and consumer migration gates.
