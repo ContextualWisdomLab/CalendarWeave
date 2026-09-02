@@ -68,3 +68,17 @@ fn classification_accessor_fails_closed_for_a_forged_projection() {
     event.icalendar = payload(Some("CLASS:NOT PRIVATE"));
     assert_eq!(event.classification(), Err(CalendarError::MalformedCalendar));
 }
+
+#[test]
+fn classification_accessor_revalidates_the_full_bounded_event_profile() {
+    let mut event = create_event(&payload(Some("CLASS:PRIVATE"))).expect("valid test event");
+    event.icalendar = event.icalendar.replace(
+        "SUMMARY:Synthetic privacy review\r\n",
+        "SUMMARY:Synthetic privacy review\r\nATTENDEE:mailto:synthetic@example.test\r\n",
+    );
+    assert_eq!(
+        event.classification(),
+        Err(CalendarError::UnsupportedCapability),
+        "a forged projection must not recover a trusted CLASS value from an otherwise unsupported event"
+    );
+}
