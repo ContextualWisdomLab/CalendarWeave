@@ -118,11 +118,11 @@ impl CalendarEvent {
     ///
     /// # Errors
     ///
-    /// Returns [`CalendarError::MalformedCalendar`] if a caller constructed a
-    /// projection whose raw calendar no longer satisfies the bounded event
-    /// structure or the `CLASS` token contract.
+    /// Returns the same bounded validation error as event admission if a caller
+    /// constructed a projection whose raw calendar no longer satisfies the
+    /// supported event profile.
     pub fn classification(&self) -> Result<EventClass, CalendarError> {
-        class_from_icalendar(&self.icalendar)
+        Ok(parse_event(&self.icalendar)?.classification)
     }
 }
 
@@ -391,6 +391,7 @@ pub(crate) struct ParsedEvent {
     pub(crate) uid: String,
     pub(crate) summary: String,
     pub(crate) status: EventStatus,
+    pub(crate) classification: EventClass,
 }
 
 pub(crate) fn parse_event(input: &str) -> Result<ParsedEvent, CalendarError> {
@@ -422,7 +423,7 @@ pub(crate) fn parse_event(input: &str) -> Result<ParsedEvent, CalendarError> {
     let uid = required_text(event.properties().get("UID"))?;
     let summary = required_text(event.properties().get("SUMMARY"))?;
     let status = parse_status(event.properties().get("STATUS"))?;
-    parse_class(event.properties().get("CLASS"))?;
+    let classification = parse_class(event.properties().get("CLASS"))?;
     validate_utc("DTSTAMP", event.properties().get("DTSTAMP"))?;
     validate_event_interval(
         event.properties().get("DTSTART"),
@@ -438,6 +439,7 @@ pub(crate) fn parse_event(input: &str) -> Result<ParsedEvent, CalendarError> {
         uid,
         summary,
         status,
+        classification,
     })
 }
 
@@ -516,17 +518,6 @@ fn ical_token(value: &str) -> bool {
         && value
             .bytes()
             .all(|byte| byte.is_ascii_alphanumeric() || byte == b'-')
-}
-
-fn class_from_icalendar(input: &str) -> Result<EventClass, CalendarError> {
-    validate_singleton_properties(input)?;
-    let calendar = Calendar::from_str(input).map_err(|_| CalendarError::MalformedCalendar)?;
-    let mut components = calendar.iter();
-    let (Some(CalendarComponent::Event(event)), None) = (components.next(), components.next())
-    else {
-        return Err(CalendarError::MalformedCalendar);
-    };
-    parse_class(event.properties().get("CLASS"))
 }
 
 fn property_name(line: &str) -> Option<&str> {
