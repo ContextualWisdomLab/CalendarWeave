@@ -4,7 +4,7 @@ CalendarWeave is ContextualWisdomLab's governed calendar-resource product for in
 
 ## What is being built
 
-The first release target is a small, independently testable calendar core that can create and retrieve tenant-scoped RFC 5545 events, preserve stable resource identity and revision evidence, enforce timezone and explicit interval semantics, and persist resources without exposing application database internals to consumers. The current candidate stack accepts bounded `DTEND` intervals and positive RFC 5545 `DURATION` intervals while broader recurrence, `VTIMEZONE`, CalDAV, provider, service-authentication, and release capabilities remain gated.
+The first release target is a small, independently testable calendar core that can create and retrieve tenant-scoped RFC 5545 events, preserve stable resource identity and revision evidence, enforce timezone and explicit interval semantics, preserve calendar-owner privacy intent, and persist resources without exposing application database internals to consumers. The current candidate stack accepts bounded `DTEND` intervals, positive RFC 5545 `DURATION` intervals, and RFC 5545 `CLASS` privacy intent while broader recurrence, `VTIMEZONE`, CalDAV, provider, service-authentication, and release capabilities remain gated.
 
 ## Current status
 
@@ -16,9 +16,10 @@ The project is in active foundation development. A public production endpoint, p
 - [Architecture](../ARCHITECTURE.md)
 - [Architecture decisions](adr/)
 - [RFC 5545 DURATION traceability](doctoring/rfc5545-duration-baseline.md)
+- [RFC 5545 CLASS privacy traceability](doctoring/rfc5545-class-privacy-baseline.md)
 - [Product and technical gap baseline](product-technical-gap-baseline.md)
 - [DeepWiki](https://deepwiki.com/ContextualWisdomLab/CalendarWeave)
 
 ## Integration boundary
 
-CalendarWeave owns generic calendar-resource and interoperability behavior. Consumer-specific scheduling decisions, domain calculations, and workflow policy remain with the consuming products and connect through versioned contracts rather than direct database access.
+CalendarWeave owns generic calendar-resource and interoperability behavior. Consumer-specific scheduling decisions, domain calculations, disclosure policy, and workflow policy remain with the consuming products and connect through versioned contracts rather than direct database access. RFC 5545 `CLASS` records owner intent and does not replace Authorization Admission or an external authorization decision.
