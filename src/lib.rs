@@ -14,7 +14,7 @@ use uuid::Uuid;
 pub mod admission;
 pub mod postgres_store;
 
-const ALLOWED_EVENT_PROPERTIES: [&str; 8] = [
+const ALLOWED_EVENT_PROPERTIES: [&str; 9] = [
     "UID",
     "DTSTAMP",
     "DTSTART",
@@ -23,6 +23,7 @@ const ALLOWED_EVENT_PROPERTIES: [&str; 8] = [
     "SUMMARY",
     "SEQUENCE",
     "STATUS",
+    "CLASS",
 ];
 
 /// A bounded failure returned by the calendar-resource application port.
@@ -107,6 +108,22 @@ pub struct CalendarEvent {
     pub icalendar: String,
 }
 
+impl CalendarEvent {
+    /// Read the RFC 5545 access classification without inventing local policy.
+    ///
+    /// An omitted `CLASS` property has the RFC 5545 default `PUBLIC`. The
+    /// returned value is descriptive calendar metadata only; consuming products
+    /// remain responsible for authorization and disclosure policy.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`CalendarError::MalformedCalendar`] if a caller constructed a
+    /// projection whose raw calendar no longer satisfies the `CLASS` contract.
+    pub fn classification(&self) -> Result<EventClass, CalendarError> {
+        class_from_icalendar(&self.icalendar)
+    }
+}
+
 /// Supported RFC 5545 VEVENT status values.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum EventStatus {
@@ -116,6 +133,17 @@ pub enum EventStatus {
     Tentative,
     /// The event is cancelled; consuming conflict policy decides occupancy.
     Cancelled,
+}
+
+/// Standard RFC 5545 access classification values.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum EventClass {
+    /// Public calendar information, including when `CLASS` is omitted.
+    Public,
+    /// Private calendar information.
+    Private,
+    /// Confidential calendar information.
+    Confidential,
 }
 
 /// Versioned application port consumed by service or package adapters.
@@ -392,6 +420,7 @@ pub(crate) fn parse_event(input: &str) -> Result<ParsedEvent, CalendarError> {
     let uid = required_text(event.properties().get("UID"))?;
     let summary = required_text(event.properties().get("SUMMARY"))?;
     let status = parse_status(event.properties().get("STATUS"))?;
+    parse_class(event.properties().get("CLASS"))?;
     validate_utc("DTSTAMP", event.properties().get("DTSTAMP"))?;
     validate_event_interval(
         event.properties().get("DTSTART"),
@@ -427,7 +456,7 @@ fn validate_singleton_properties(input: &str) -> Result<(), CalendarError> {
             return Err(CalendarError::MalformedCalendar);
         }
     }
-    for optional in ["SEQUENCE", "STATUS", "DTEND", "DURATION"] {
+    for optional in ["SEQUENCE", "STATUS", "CLASS", "DTEND", "DURATION"] {
         if property_count(input, optional) > 1 {
             return Err(CalendarError::MalformedCalendar);
         }
@@ -458,6 +487,31 @@ fn parse_status(property: Option<&Property>) -> Result<EventStatus, CalendarErro
         "CANCELLED" => Ok(EventStatus::Cancelled),
         _ => Err(CalendarError::MalformedCalendar),
     }
+}
+
+fn parse_class(property: Option<&Property>) -> Result<EventClass, CalendarError> {
+    let Some(property) = property else {
+        return Ok(EventClass::Public);
+    };
+    if !property.params().is_empty() {
+        return Err(CalendarError::MalformedCalendar);
+    }
+    match property.value() {
+        "PUBLIC" => Ok(EventClass::Public),
+        "PRIVATE" => Ok(EventClass::Private),
+        "CONFIDENTIAL" => Ok(EventClass::Confidential),
+        _ => Err(CalendarError::MalformedCalendar),
+    }
+}
+
+fn class_from_icalendar(input: &str) -> Result<EventClass, CalendarError> {
+    let calendar = Calendar::from_str(input).map_err(|_| CalendarError::MalformedCalendar)?;
+    let mut components = calendar.iter();
+    let (Some(CalendarComponent::Event(event)), None) = (components.next(), components.next())
+    else {
+        return Err(CalendarError::MalformedCalendar);
+    };
+    parse_class(event.properties().get("CLASS"))
 }
 
 fn property_name(line: &str) -> Option<&str> {
