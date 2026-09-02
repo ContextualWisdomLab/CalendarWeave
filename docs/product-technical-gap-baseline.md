@@ -36,6 +36,7 @@ Time and privacy behavior is explicit:
 - #8 accepts positive RFC 5545 `DURATION` as the alternative to `DTEND`; both, neither, duplicate, negative/zero, calendar-month/year, fractional, reordered, and unsupported-parameter forms fail closed under the bounded v1 profile.
 - DATE `DTSTART` accepts only day/week duration forms. Named-timezone starts reuse the existing ambiguity/nonexistence/unknown-zone fail-closed contract.
 - #9 accepts one optional RFC 5545 `CLASS`. Omission projects as `PUBLIC`; `PUBLIC`/`PRIVATE`/`CONFIDENTIAL` are case-insensitive; valid unrecognized IANA/experimental token values project as `PRIVATE`; IANA/non-standard parameters remain interoperable; duplicate, empty or non-token values fail malformed.
+- `CalendarEvent::classification()` revalidates the same complete bounded event profile before returning a classification, so a manually forged projection with an unsupported property or other invalid raw payload cannot recover apparently trusted privacy metadata.
 - `CLASS` is calendar-owner intent only. A public value cannot override denied/unavailable authorization, and private/confidential values do not themselves grant or enforce access.
 - Floating local time, `VTIMEZONE`, recurrence/free-busy expansion and unversioned provider/CalDAV capabilities remain outside the candidate profile.
 
@@ -53,7 +54,7 @@ Persistence remains 3NF with descriptive multiword `snake_case` objects: `calend
 | #6 `feat/authorization-admission-v1` | `9b3500633b4b7c7a9ac1e43dda10140ec0f1aedc` | live REST confirms open/non-Draft exact head; Tests run `33563830224` remains queued, so no pass is claimed |
 | #7 `feat/postgres-recovery-v1` | `1473e0ae8e9ddbe3343190941f6125dbcac03bcc` | live REST confirms open Draft exact head; recovery/rust/coverage exact-head jobs remain required and queued/unassigned |
 | #8 `feat/rfc5545-duration-v1` | `7521b6b39170c29b71d11fc90d48e9000f7bcce8` | live REST confirms open Draft exact head; current-head Tests remains required before Ready/merge progression |
-| #9 `feat/rfc5545-class-v1` | pre-baseline head `2052e46cb03bc4c8db8404c2edfe4b5cd9a75cc6`; this baseline commit advances the head | RED-first CLASS implementation + ADR/research/architecture/README/contributor alignment; exact-head checks must regenerate after this commit |
+| #9 `feat/rfc5545-class-v1` | pre-baseline exact head `059b76ab7185b68df1dacb44805f337a7cd7af24`; this baseline commit advances the head | RED-first CLASS implementation plus forged-projection hardening and synchronized ADR/research/architecture/product docs; exact-head checks must regenerate after this commit |
 | central runner acquisition | ContextualWisdomLab/.github #712 | current central evidence identifies avoidable COMMENTED-review scheduler wakeups as one causal queue-amplification defect; do not churn leaf heads or declare queued jobs passing |
 
 The live governance path requires exact-current-head checks/reviews. This run attempted the safe Draft→Ready transition for #3; the GraphQL API returned a rate-limit error, so no repeated mutation storm, self-approval, admin bypass, or protection weakening was used.
@@ -61,6 +62,8 @@ The live governance path requires exact-current-head checks/reviews. This run at
 ## PR #9 TDD and research traceability
 
 The initial RED commit `b91602811a231c726ab5fbc5a2e0a1af894e9346` added `tests/rfc5545_classification.rs` before production CLASS support. A standards audit then corrected overly narrow assumptions before final production behavior: `18d3ea264d2f0c3bfeea10e5af6fa01ff4bbe706` requires case-insensitive standard values, extension-parameter interoperability, and fail-private handling for valid unknown registered/experimental values. `707fcecdb45a273028b2d7966888c3a507d268d5` implements that corrected Rust contract.
+
+A subsequent exact-head static review found that the public classification accessor re-parsed only singleton/component/classification structure rather than the entire supported event profile. That meant a manually forged public `CalendarEvent` could retain a valid `CLASS` while gaining an unsupported property and still return a classification. `bfe078a556677ec99d76c87533bcbd5967836da6` added the RED regression first; `b12f95dee6b3a73f87a56316a48830f45ae3612b` then made the accessor reuse `parse_event` and moved the parsed classification into `ParsedEvent`, so classification now inherits the same fail-closed full-profile validation as event admission.
 
 ADR-0008 and `docs/doctoring/rfc5545-class-privacy-baseline.md` bind the candidate to RFC 5545 sections 3.1 and 3.8.1.3. RFC 5545 defines omitted CLASS as PUBLIC, permits IANA/non-standard parameters, requires unrecognized iana-token/x-name values to be treated like PRIVATE, and explicitly warns that CLASS is owner intent rather than an enforcement statement. The same RFC states enumerated values are case-insensitive. These semantics are represented directly rather than replaced with a local heuristic.
 
@@ -90,7 +93,7 @@ Issue #2 remains the canonical commercialization tracker and stays open. #9 addr
 - No deprecation-warning suppression, production synthetic data, self-approval, force-push, destructive rebase, routine bypass, or protection weakening.
 - CalendarWeave and LineageWeave contain no mathematical/psychometric computation that belongs in dedicated mathematical owners.
 - Authorization precedes untrusted calendar parsing/mutation. Cross-tenant and absent-resource observations remain indistinguishable at the core boundary.
-- RFC 5545 `CLASS` is not access-control authority; valid unknown tokens fail-private to avoid accidental widening.
+- RFC 5545 `CLASS` is not access-control authority; valid unknown tokens fail-private to avoid accidental widening, and public classification projections must pass the full supported-event validator before being trusted.
 - Necessary calendar PII is protected through least privilege, purpose/tenant isolation, encryption, retention, export/access audit and test anonymization rather than blanket masking that breaks calendar work.
 - Relational persistence stays normalized; item-level idempotency/UPSERT semantics remain explicit; writes lock only the required item.
 - Logical-backup digest verification is integrity evidence, not encryption, provenance, PITR, HA or RPO/RTO evidence.
