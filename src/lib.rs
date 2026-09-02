@@ -14,8 +14,15 @@ use uuid::Uuid;
 pub mod admission;
 pub mod postgres_store;
 
-const ALLOWED_EVENT_PROPERTIES: [&str; 7] = [
-    "UID", "DTSTAMP", "DTSTART", "DTEND", "SUMMARY", "SEQUENCE", "STATUS",
+const ALLOWED_EVENT_PROPERTIES: [&str; 8] = [
+    "UID",
+    "DTSTAMP",
+    "DTSTART",
+    "DTEND",
+    "DURATION",
+    "SUMMARY",
+    "SEQUENCE",
+    "STATUS",
 ];
 
 /// A bounded failure returned by the calendar-resource application port.
@@ -386,9 +393,10 @@ pub(crate) fn parse_event(input: &str) -> Result<ParsedEvent, CalendarError> {
     let summary = required_text(event.properties().get("SUMMARY"))?;
     let status = parse_status(event.properties().get("STATUS"))?;
     validate_utc("DTSTAMP", event.properties().get("DTSTAMP"))?;
-    validate_interval(
+    validate_event_interval(
         event.properties().get("DTSTART"),
         event.properties().get("DTEND"),
+        event.properties().get("DURATION"),
     )?;
     if let Some(sequence) = event.properties().get("SEQUENCE")
         && (!sequence.params().is_empty() || sequence.value().parse::<u32>().is_err())
@@ -411,30 +419,30 @@ pub(crate) fn validated_display_name(display_name: &str) -> Result<String, Calen
 }
 
 fn validate_singleton_properties(input: &str) -> Result<(), CalendarError> {
-    const REQUIRED_ONCE: [&str; 7] = [
-        "VERSION", "PRODID", "UID", "DTSTAMP", "DTSTART", "DTEND", "SUMMARY",
+    const REQUIRED_ONCE: [&str; 6] = [
+        "VERSION", "PRODID", "UID", "DTSTAMP", "DTSTART", "SUMMARY",
     ];
     for required in REQUIRED_ONCE {
-        if input
-            .split("\r\n")
-            .filter(|line| property_name(line) == Some(required))
-            .count()
-            != 1
-        {
+        if property_count(input, required) != 1 {
             return Err(CalendarError::MalformedCalendar);
         }
     }
-    for optional in ["SEQUENCE", "STATUS"] {
-        if input
-            .split("\r\n")
-            .filter(|line| property_name(line) == Some(optional))
-            .count()
-            > 1
-        {
+    for optional in ["SEQUENCE", "STATUS", "DTEND", "DURATION"] {
+        if property_count(input, optional) > 1 {
             return Err(CalendarError::MalformedCalendar);
         }
+    }
+    if property_count(input, "DTEND") + property_count(input, "DURATION") != 1 {
+        return Err(CalendarError::MalformedCalendar);
     }
     Ok(())
+}
+
+fn property_count(input: &str, property: &str) -> usize {
+    input
+        .split("\r\n")
+        .filter(|line| property_name(line) == Some(property))
+        .count()
 }
 
 fn parse_status(property: Option<&Property>) -> Result<EventStatus, CalendarError> {
@@ -476,12 +484,20 @@ fn validate_utc(_name: &str, property: Option<&Property>) -> Result<(), Calendar
     Ok(())
 }
 
-fn validate_interval(
+fn validate_event_interval(
     start: Option<&Property>,
     end: Option<&Property>,
+    duration: Option<&Property>,
 ) -> Result<(), CalendarError> {
     let start = start.ok_or(CalendarError::MalformedCalendar)?;
-    let end = end.ok_or(CalendarError::MalformedCalendar)?;
+    match (end, duration) {
+        (Some(end), None) => validate_dtend_interval(start, end),
+        (None, Some(duration)) => validate_duration_interval(start, duration),
+        _ => Err(CalendarError::MalformedCalendar),
+    }
+}
+
+fn validate_dtend_interval(start: &Property, end: &Property) -> Result<(), CalendarError> {
     let start_is_date = start
         .params()
         .get("VALUE")
@@ -531,6 +547,136 @@ fn validate_interval(
     (end > start)
         .then_some(())
         .ok_or(CalendarError::MalformedCalendar)
+}
+
+fn validate_duration_interval(
+    start: &Property,
+    duration: &Property,
+) -> Result<(), CalendarError> {
+    if !duration.params().is_empty() {
+        return Err(CalendarError::UnsupportedCapability);
+    }
+    let start_is_date = start
+        .params()
+        .get("VALUE")
+        .is_some_and(|value| value.value() == "DATE");
+    if start_is_date {
+        if start.params().len() != 1
+            || NaiveDate::parse_from_str(start.value(), "%Y%m%d").is_err()
+            || !positive_duration(duration.value(), true)
+        {
+            return Err(CalendarError::MalformedCalendar);
+        }
+        return Ok(());
+    }
+    validate_datetime_start(start)?;
+    positive_duration(duration.value(), false)
+        .then_some(())
+        .ok_or(CalendarError::MalformedCalendar)
+}
+
+fn validate_datetime_start(start: &Property) -> Result<(), CalendarError> {
+    if let Some(tzid) = start.params().get("TZID") {
+        if start.params().len() != 1 {
+            return Err(CalendarError::MalformedCalendar);
+        }
+        let timezone = tzid
+            .value()
+            .parse::<Tz>()
+            .map_err(|_| CalendarError::UnsupportedCapability)?;
+        named_datetime(timezone, start.value()).map(|_| ())
+    } else {
+        if !start.params().is_empty() {
+            return Err(CalendarError::UnsupportedCapability);
+        }
+        NaiveDateTime::parse_from_str(start.value(), "%Y%m%dT%H%M%SZ")
+            .map(|_| ())
+            .map_err(|_| CalendarError::UnsupportedCapability)
+    }
+}
+
+fn positive_duration(value: &str, date_only: bool) -> bool {
+    let value = value.strip_prefix('+').unwrap_or(value);
+    let Some(body) = value.strip_prefix('P') else {
+        return false;
+    };
+    if body.is_empty() {
+        return false;
+    }
+    if let Some(weeks) = body.strip_suffix('W') {
+        return positive_digits(weeks);
+    }
+    if let Some(days) = body.strip_suffix('D') {
+        return positive_digits(days);
+    }
+    if date_only {
+        return false;
+    }
+    if let Some(time) = body.strip_prefix('T') {
+        return duration_time_nonzero(time).is_some_and(|nonzero| nonzero);
+    }
+    let Some((days, time)) = body.split_once("DT") else {
+        return false;
+    };
+    let day_nonzero =
+        digits(days).is_some_and(|digits| digits.bytes().any(|digit| digit != b'0'));
+    let Some(time_nonzero) = duration_time_nonzero(time) else {
+        return false;
+    };
+    day_nonzero || time_nonzero
+}
+
+fn positive_digits(value: &str) -> bool {
+    digits(value).is_some_and(|digits| digits.bytes().any(|digit| digit != b'0'))
+}
+
+fn digits(value: &str) -> Option<&str> {
+    (!value.is_empty() && value.bytes().all(|byte| byte.is_ascii_digit())).then_some(value)
+}
+
+fn take_digits(value: &str) -> Option<(&str, &str)> {
+    let count = value.bytes().take_while(u8::is_ascii_digit).count();
+    (count > 0).then(|| value.split_at(count))
+}
+
+fn duration_time_nonzero(value: &str) -> Option<bool> {
+    let (first, suffix) = take_digits(value)?;
+    let mut nonzero = first.bytes().any(|digit| digit != b'0');
+    if let Some(rest) = suffix.strip_prefix('H') {
+        if rest.is_empty() {
+            return Some(nonzero);
+        }
+        let (next_value, suffix) = take_digits(rest)?;
+        if let Some(rest) = suffix.strip_prefix('M') {
+            nonzero |= next_value.bytes().any(|digit| digit != b'0');
+            if rest.is_empty() {
+                return Some(nonzero);
+            }
+            let (seconds, suffix) = take_digits(rest)?;
+            if suffix != "S" {
+                return None;
+            }
+            nonzero |= seconds.bytes().any(|digit| digit != b'0');
+            return Some(nonzero);
+        }
+        if suffix == "S" {
+            nonzero |= next_value.bytes().any(|digit| digit != b'0');
+            return Some(nonzero);
+        }
+        return None;
+    }
+    if let Some(rest) = suffix.strip_prefix('M') {
+        if rest.is_empty() {
+            return Some(nonzero);
+        }
+        let (seconds, suffix) = take_digits(rest)?;
+        if suffix != "S" {
+            return None;
+        }
+        nonzero |= seconds.bytes().any(|digit| digit != b'0');
+        return Some(nonzero);
+    }
+    (suffix == "S").then_some(nonzero)
 }
 
 fn named_datetime(timezone: Tz, value: &str) -> Result<chrono::DateTime<Tz>, CalendarError> {

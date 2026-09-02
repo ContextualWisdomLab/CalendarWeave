@@ -23,9 +23,9 @@ Calendar systems become difficult to integrate when resource identity, revisions
 
 ## Current status
 
-CalendarWeave is under active foundation development. The protected default branch is still a seed repository; this documentation branch defines the product boundary and migration contract, not a released runtime.
+CalendarWeave is under active foundation development. The protected default branch is still a seed repository; this implementation stack defines and proves candidate product behavior, not a released runtime.
 
-The implementation stack is building a tenant-scoped Calendar Resource Core, durable persistence, and strict RFC 5545 time semantics before any production service, CalDAV endpoint, provider parity, or consumer-migration claim is made. Candidate behavior in open pull requests is not protected-main or release evidence.
+The implementation stack is building a tenant-scoped Calendar Resource Core, durable persistence, strict RFC 5545 time semantics, authorization admission, and recoverability evidence before any production service, CalDAV endpoint, provider parity, or consumer-migration claim is made. Candidate behavior in open pull requests is not protected-main or release evidence.
 
 ### What you can rely on today
 
@@ -36,9 +36,11 @@ The implementation stack is building a tenant-scoped Calendar Resource Core, dur
 
 ### Executable candidate evidence
 
-The implementation stack contains a Rust v0.1 application port for tenant-scoped collection creation and strict RFC 5545 VEVENT create, conditional-update, list, and get behavior. It accepts UTC, all-day, and bounded matching-IANA-`TZID` intervals, preserves standard event status, returns opaque event references with revision/ETag evidence, checks authorization scope before parsing payloads, and fails closed for malformed, cross-tenant, stale-revision, ambiguous/nonexistent local-time, and unsupported requests.
+The implementation stack contains a Rust v0.1 application port for tenant-scoped collection creation and strict RFC 5545 VEVENT create, conditional-update, list, and get behavior. It accepts UTC, all-day, and bounded matching-IANA-`TZID` intervals; the newest candidate also accepts positive RFC 5545 `DURATION` values as the explicit alternative to `DTEND`, including DATE-start day/week restrictions. The core preserves standard event status, returns opaque event references with revision/ETag evidence, and fails closed for malformed, cross-tenant, stale-revision, ambiguous/nonexistent local-time, and unsupported requests.
 
-The durable-store slice adds a 3NF PostgreSQL adapter with restart-stable event identity, append-only revisions, item-level create idempotency by collection plus RFC UID, and row-locked strong-ETag updates. That is candidate evidence, not an operated backup/recovery claim.
+The durable-store slice adds a 3NF PostgreSQL adapter with restart-stable event identity, append-only revisions, item-level create idempotency by collection plus RFC UID, and row-locked strong-ETag updates. A later candidate adds a digest-verified logical backup/restore drill, but that is not an operated disaster-recovery, PITR, HA, or RPO/RTO claim.
+
+Authorization admission uses externally verified issuer/subject evidence without allowing the caller to choose a tenant. The trusted authorization decision derives tenant scope for the exact calendar action/resource request before parsing or mutation. This is candidate application-boundary evidence, not a released authentication service or Keyverse token-verification adapter.
 
 These executable candidates are not protected-main, a released package or service, a CalDAV endpoint, provider parity, `VTIMEZONE`/recurrence support, or a consumer migration contract.
 
@@ -48,7 +50,7 @@ The first release target is intentionally small and testable:
 
 1. create a tenant-scoped calendar collection;
 2. create and retrieve an RFC 5545 VEVENT with stable identity and revision evidence;
-3. preserve supported timezone and interval semantics fail-closed;
+3. preserve supported timezone and explicit `DTEND`/`DURATION` interval semantics fail-closed;
 4. persist the resource through a durable adapter; and
 5. expose a versioned application contract that other products can consume without database coupling.
 
@@ -75,7 +77,7 @@ CalendarWeave owns generic calendar resources. Adjacent products retain their ow
 | LineageWeave | Owns read-only lineage/evidence composition and deep links; does not own calendar persistence or provider credentials |
 | `saju-caldav` | Owns saju-specific candidate calculation, scoring, explanation and publication intent; its current generic CalDAV path remains compatibility infrastructure until parity is proven |
 | `four-pillars` | Owns deterministic Four Pillars calculation/reporting; that computation stays outside CalendarWeave |
-| Keyverse | Owns identity and federation; CalendarWeave consumes scoped identity rather than implementing a local identity provider |
+| Keyverse | Owns identity/federation and external authorization policy; CalendarWeave consumes verified principal evidence and a resource-aware authorization decision rather than implementing a local identity provider |
 
 Consumers must not read CalendarWeave application tables directly or import provider DTOs as their domain model. The migration path is contract-first, parity-tested, and reversible until the replacement is proven.
 
@@ -123,7 +125,7 @@ Those are development and release requirements, not claims that the current seed
 
 ## Contributing and support
 
-Before changing calendar behavior or ownership boundaries, read [`AGENTS.md`](AGENTS.md), the architecture, and the applicable ADR. Keep consumer-specific policy outside CalendarWeave, preserve fail-closed capability boundaries, and update tests, public contracts, documentation, and migration evidence together when behavior changes.
+Before changing calendar behavior or ownership boundaries, read [`AGENTS.md`](AGENTS.md), [`CLAUDE.md`](CLAUDE.md), the architecture, and the applicable ADR. Keep consumer-specific policy outside CalendarWeave, preserve fail-closed capability boundaries, and update tests, public contracts, documentation, and migration evidence together when behavior changes.
 
 Use the repository issue tracker for product defects, interoperability gaps, and integration questions. Do not infer support for an unreleased capability from an open branch or design document.
 
