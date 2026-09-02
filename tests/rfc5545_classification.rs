@@ -21,12 +21,12 @@ fn create_event(input: &str) -> Result<CalendarEvent, CalendarError> {
 }
 
 #[test]
-fn class_defaults_to_public_and_exposes_standard_privacy_values() {
+fn class_defaults_to_public_and_exposes_standard_privacy_values_case_insensitively() {
     for (class_line, expected) in [
         (None, EventClass::Public),
         (Some("CLASS:PUBLIC"), EventClass::Public),
-        (Some("CLASS:PRIVATE"), EventClass::Private),
-        (Some("CLASS:CONFIDENTIAL"), EventClass::Confidential),
+        (Some("CLASS:private"), EventClass::Private),
+        (Some("CLASS:Confidential"), EventClass::Confidential),
     ] {
         let event = create_event(&payload(class_line)).expect("standard CLASS must be accepted");
         assert_eq!(event.classification(), Ok(expected));
@@ -34,13 +34,25 @@ fn class_defaults_to_public_and_exposes_standard_privacy_values() {
 }
 
 #[test]
-fn class_is_singleton_parameter_free_and_standard_value_only() {
+fn unknown_registered_or_experimental_class_values_fail_private() {
+    for class_line in [
+        "CLASS:RESTRICTED",
+        "CLASS:X-SYNTHETIC-RESTRICTED",
+        "CLASS;X-SYNTHETIC-HINT=LOCAL:X-SYNTHETIC-RESTRICTED",
+    ] {
+        let event = create_event(&payload(Some(class_line)))
+            .expect("RFC token CLASS values must remain interoperable");
+        assert_eq!(event.classification(), Ok(EventClass::Private));
+    }
+}
+
+#[test]
+fn class_is_singleton_and_rejects_non_token_values() {
     for class_lines in [
         "CLASS:PRIVATE\r\nCLASS:PUBLIC",
-        "CLASS;X-SYNTHETIC=1:PRIVATE",
-        "CLASS:SECRET",
-        "CLASS:private",
         "CLASS:",
+        "CLASS:NOT PRIVATE",
+        "CLASS:PRIVATE_VALUE",
     ] {
         assert_eq!(
             create_event(&payload(Some(class_lines))),
@@ -53,6 +65,6 @@ fn class_is_singleton_parameter_free_and_standard_value_only() {
 #[test]
 fn classification_accessor_fails_closed_for_a_forged_projection() {
     let mut event = create_event(&payload(Some("CLASS:PRIVATE"))).expect("valid test event");
-    event.icalendar = payload(Some("CLASS:SECRET"));
+    event.icalendar = payload(Some("CLASS:NOT PRIVATE"));
     assert_eq!(event.classification(), Err(CalendarError::MalformedCalendar));
 }
