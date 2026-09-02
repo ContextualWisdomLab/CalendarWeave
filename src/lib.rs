@@ -419,7 +419,9 @@ pub(crate) fn validated_display_name(display_name: &str) -> Result<String, Calen
 }
 
 fn validate_singleton_properties(input: &str) -> Result<(), CalendarError> {
-    const REQUIRED_ONCE: [&str; 6] = ["VERSION", "PRODID", "UID", "DTSTAMP", "DTSTART", "SUMMARY"];
+    const REQUIRED_ONCE: [&str; 6] = [
+        "VERSION", "PRODID", "UID", "DTSTAMP", "DTSTART", "SUMMARY",
+    ];
     for required in REQUIRED_ONCE {
         if property_count(input, required) != 1 {
             return Err(CalendarError::MalformedCalendar);
@@ -598,7 +600,7 @@ fn positive_duration(value: &str, date_only: bool) -> bool {
     let Some(body) = value.strip_prefix('P') else {
         return false;
     };
-    if body.is_empty() || value.starts_with('-') {
+    if body.is_empty() {
         return false;
     }
     if let Some(weeks) = body.strip_suffix('W') {
@@ -616,7 +618,8 @@ fn positive_duration(value: &str, date_only: bool) -> bool {
     let Some((days, time)) = body.split_once("DT") else {
         return false;
     };
-    let day_nonzero = digits(days).is_some_and(|digits| digits.bytes().any(|digit| digit != b'0'));
+    let day_nonzero =
+        digits(days).is_some_and(|digits| digits.bytes().any(|digit| digit != b'0'));
     let Some(time_nonzero) = duration_time_nonzero(time) else {
         return false;
     };
@@ -643,18 +646,24 @@ fn duration_time_nonzero(value: &str) -> Option<bool> {
         if rest.is_empty() {
             return Some(nonzero);
         }
-        let (minutes, suffix) = take_digits(rest)?;
-        let rest = suffix.strip_prefix('M')?;
-        nonzero |= minutes.bytes().any(|digit| digit != b'0');
-        if rest.is_empty() {
+        let (next_value, suffix) = take_digits(rest)?;
+        if let Some(rest) = suffix.strip_prefix('M') {
+            nonzero |= next_value.bytes().any(|digit| digit != b'0');
+            if rest.is_empty() {
+                return Some(nonzero);
+            }
+            let (seconds, suffix) = take_digits(rest)?;
+            if suffix != "S" {
+                return None;
+            }
+            nonzero |= seconds.bytes().any(|digit| digit != b'0');
             return Some(nonzero);
         }
-        let (seconds, suffix) = take_digits(rest)?;
-        if suffix != "S" {
-            return None;
+        if suffix == "S" {
+            nonzero |= next_value.bytes().any(|digit| digit != b'0');
+            return Some(nonzero);
         }
-        nonzero |= seconds.bytes().any(|digit| digit != b'0');
-        return Some(nonzero);
+        return None;
     }
     if let Some(rest) = suffix.strip_prefix('M') {
         if rest.is_empty() {
