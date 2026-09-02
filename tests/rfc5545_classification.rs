@@ -29,7 +29,7 @@ fn class_defaults_to_public_and_exposes_standard_privacy_values() {
         (Some("CLASS:CONFIDENTIAL"), EventClass::Confidential),
     ] {
         let event = create_event(&payload(class_line)).expect("standard CLASS must be accepted");
-        assert_eq!(event.classification, expected);
+        assert_eq!(event.classification(), Ok(expected));
     }
 }
 
@@ -48,4 +48,11 @@ fn class_is_singleton_parameter_free_and_standard_value_only() {
             "invalid CLASS must fail closed: {class_lines}"
         );
     }
+}
+
+#[test]
+fn classification_accessor_fails_closed_for_a_forged_projection() {
+    let mut event = create_event(&payload(Some("CLASS:PRIVATE"))).expect("valid test event");
+    event.icalendar = payload(Some("CLASS:SECRET"));
+    assert_eq!(event.classification(), Err(CalendarError::MalformedCalendar));
 }
