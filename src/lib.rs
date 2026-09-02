@@ -111,14 +111,16 @@ pub struct CalendarEvent {
 impl CalendarEvent {
     /// Read the RFC 5545 access classification without inventing local policy.
     ///
-    /// An omitted `CLASS` property has the RFC 5545 default `PUBLIC`. The
-    /// returned value is descriptive calendar metadata only; consuming products
-    /// remain responsible for authorization and disclosure policy.
+    /// An omitted `CLASS` property has the RFC 5545 default `PUBLIC`. Standard
+    /// enumerated values are case-insensitive, while unknown registered or
+    /// experimental token values conservatively project as `PRIVATE` as RFC
+    /// 5545 requires. `CLASS` is intent metadata, not an authorization grant.
     ///
     /// # Errors
     ///
     /// Returns [`CalendarError::MalformedCalendar`] if a caller constructed a
-    /// projection whose raw calendar no longer satisfies the `CLASS` contract.
+    /// projection whose raw calendar no longer satisfies the bounded event
+    /// structure or the `CLASS` token contract.
     pub fn classification(&self) -> Result<EventClass, CalendarError> {
         class_from_icalendar(&self.icalendar)
     }
@@ -140,7 +142,7 @@ pub enum EventStatus {
 pub enum EventClass {
     /// Public calendar information, including when `CLASS` is omitted.
     Public,
-    /// Private calendar information.
+    /// Private calendar information, including unknown registered extensions.
     Private,
     /// Confidential calendar information.
     Confidential,
@@ -493,18 +495,31 @@ fn parse_class(property: Option<&Property>) -> Result<EventClass, CalendarError>
     let Some(property) = property else {
         return Ok(EventClass::Public);
     };
-    if !property.params().is_empty() {
-        return Err(CalendarError::MalformedCalendar);
+    let value = property.value();
+    if value.eq_ignore_ascii_case("PUBLIC") {
+        return Ok(EventClass::Public);
     }
-    match property.value() {
-        "PUBLIC" => Ok(EventClass::Public),
-        "PRIVATE" => Ok(EventClass::Private),
-        "CONFIDENTIAL" => Ok(EventClass::Confidential),
-        _ => Err(CalendarError::MalformedCalendar),
+    if value.eq_ignore_ascii_case("PRIVATE") {
+        return Ok(EventClass::Private);
     }
+    if value.eq_ignore_ascii_case("CONFIDENTIAL") {
+        return Ok(EventClass::Confidential);
+    }
+    if ical_token(value) {
+        return Ok(EventClass::Private);
+    }
+    Err(CalendarError::MalformedCalendar)
+}
+
+fn ical_token(value: &str) -> bool {
+    !value.is_empty()
+        && value
+            .bytes()
+            .all(|byte| byte.is_ascii_alphanumeric() || byte == b'-')
 }
 
 fn class_from_icalendar(input: &str) -> Result<EventClass, CalendarError> {
+    validate_singleton_properties(input)?;
     let calendar = Calendar::from_str(input).map_err(|_| CalendarError::MalformedCalendar)?;
     let mut components = calendar.iter();
     let (Some(CalendarComponent::Event(event)), None) = (components.next(), components.next())
