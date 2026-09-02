@@ -33,9 +33,9 @@ Time/interval candidate behavior is explicit:
 
 - `DTEND` remains supported for UTC, all-day DATE, and matching bounded IANA `TZID` intervals, with non-increasing intervals rejected.
 - PR #8 adds positive RFC 5545 `DURATION` as the alternative to `DTEND`; both present, neither present, or duplicate interval fields fail closed under the CalendarWeave v1 profile.
-- `DURATION` accepts RFC 5545 week/day/hour/minute/second lexical ordering, including explicit `+`; negative, zero, years, calendar months, fractions, mixed week/date forms, and reordered units fail closed.
+- `DURATION` accepts RFC 5545 week/day/hour/minute/second lexical ordering, including explicit `+`; the optional-minute grammar is covered explicitly (`PT1H30S` and `P1DT1H30S`), while negative, zero, years, calendar months, fractions, mixed week/date forms, and reordered units fail closed.
 - DATE `DTSTART` accepts only day/week duration forms as required by RFC 5545.
-- The existing bounded profile continues to reject floating local time, unknown/ambiguous/nonexistent named local starts, `VTIMEZONE`, recurrence, and uninterpreted duration parameters until separately versioned.
+- The existing bounded profile continues to reject floating local time, unknown/ambiguous/nonexistent named local starts, `VTIMEZONE`, recurrence, and uninterpreted duration parameters until separately versioned. PR #8 now contains direct DURATION regressions for unknown, ambiguous, and nonexistent named starts rather than relying only on predecessor TZID tests.
 - Nominal duration is preserved in the original iCalendar payload; this slice does not invent a fixed-second end across DST discontinuities.
 
 Persistence remains 3NF with descriptive multiword `snake_case` objects: `calendar_collection`, `calendar_event`, and `calendar_event_revision`. No duration table or denormalized computed-end column is added; both adapters use the shared parser and the durable revision stores `icalendar_payload`.
@@ -51,20 +51,20 @@ Persistence remains 3NF with descriptive multiword `snake_case` objects: `calend
 | PR #5 `feat/tzid-calendar-interval-v1` | `b68a1c566f0fee520459f297a2f94a2ffa5bac24` | Exact `Tests` run `33533050155` completed success; same live Ready-mutation connector failure |
 | PR #6 `feat/authorization-admission-v1` | `9b3500633b4b7c7a9ac1e43dda10140ec0f1aedc` | Open/non-Draft/mergeable; exact `Tests` run `33563830224` still queued; unresolved review thread correctly remains open because it asks for hosted exact-head check evidence |
 | PR #7 `feat/postgres-recovery-v1` | `1473e0ae8e9ddbe3343190941f6125dbcac03bcc` | Draft/mergeable; exact `Tests` run `33569539054` still queued; recovery cannot be promoted without execution evidence |
-| PR #8 `feat/rfc5545-duration-v1` | pre-baseline head `c73300e7518496fd31e2857da75f643c2d6c4fa1`; this baseline commit advances the head | Test-first DURATION lane; `Tests` run `33579911833` was queued on the pre-baseline head, so it becomes historical after this commit; re-read new exact head and reacquire checks/reviews |
+| PR #8 `feat/rfc5545-duration-v1` | pre-baseline head `7e356a6f4eaa0fb60722b23e6c9953fcdea9df02`; this baseline commit advances the head | Test-first DURATION lane; exact-head `Tests` run `33580394726` had rust/coverage/recovery all queued with zero steps and no assigned runner, so it becomes historical after this commit; re-read the new exact head and reacquire checks/reviews |
 | Central runner acquisition | ContextualWisdomLab/.github #712 | Current organization-level queue evidence continues to show explicit Ubuntu jobs unassigned; do not rewrite leaf runner selectors or claim queued as passing |
 
 The live CalendarWeave organization ruleset requires an approving review, stale-review dismissal, review-thread resolution, and central required workflows on the protected default branch. No self-approval, admin bypass, required-check weakening, force-push, or destructive rebase is permitted for commercialization progress.
 
 ## PR #8 test-first and research traceability
 
-The RED contract is commit `7b22940c1b26f69a79b66a50de72e0a436821600`, which added `tests/rfc5545_duration.rs` while production still excluded `DURATION` and required `DTEND`. The production parser implementation followed in `0606f8b72e97c21b3d64945dc8b22a4688ea6358`. This establishes behavioral ordering independently of hosted-runner availability.
+The primary RED contract is commit `7b22940c1b26f69a79b66a50de72e0a436821600`, which added `tests/rfc5545_duration.rs` while production still excluded `DURATION` and required `DTEND`. The production parser implementation followed in `0606f8b72e97c21b3d64945dc8b22a4688ea6358`. A later exact RFC grammar audit found that RFC 5545 permits the hour form to omit minutes while still including seconds; `c48b2019031d579646ad7aa1f57beab492d85acd` added `PT1H30S`/`P1DT1H30S` plus named-timezone edge regressions before `7e356a6f4eaa0fb60722b23e6c9953fcdea9df02` repaired the parser. This preserves RED→GREEN ordering for the discovered edge defect independently of hosted-runner availability.
 
 ADR-0007 and `docs/doctoring/rfc5545-duration-baseline.md` bind the behavior to RFC 5545 sections 3.3.6, 3.6.1, and 3.8.2.5. RFC 5545 defines `DTEND` and `DURATION` as mutually exclusive VEVENT alternatives, defines `DURATION` as positive, requires DATE-start durations to be day/week forms, and distinguishes nominal day/week duration across time-scale discontinuities. CalendarWeave's additional requirement that one explicit interval form be present is an intentional bounded v1 product restriction, not represented as full RFC conformance.
 
 ## Open issue state
 
-Issue #2 remains the canonical commercialization tracker and must stay open. It maps to real product, security, reliability, interoperability, release, and ecosystem gaps. PR #8 addresses only the explicit `DURATION` portion of the RFC 5545 capability gap. No current evidence proves a versioned release, production authentication, CalDAV/provider parity, measured disaster recovery, privacy/audit operation, or downstream migration, so closure would be false.
+Issue #2 remains the canonical commercialization tracker and must stay open. It maps to real product, security, reliability, interoperability, release, and ecosystem gaps. PR #8 addresses only the explicit `DURATION` portion of the RFC 5545 capability gap. The issue now contains a current PR #8 progress comment; no current evidence proves a versioned release, production authentication, CalDAV/provider parity, measured disaster recovery, privacy/audit operation, or downstream migration, so closure would be false.
 
 ## Commercialization gaps
 
@@ -78,7 +78,7 @@ Issue #2 remains the canonical commercialization tracker and must stay open. It 
 | Release/package/service | CalendarWeave | No versioned public artifact | Define package/service contract, compose deployment, SBOM/provenance, rollback | Immutable versioned artifact/service plus real install/call path |
 | Consumer migration | Naruon / `saju-caldav` / LineageWeave | Compatibility implementations remain | Characterization tests then versioned ACLs after release | No direct table coupling; parity/security/failure semantics and reversible cutover |
 | Hosted exact-head verification | ContextualWisdomLab/.github #712 | #6/#7/#8 jobs queued/unassigned | Continue central runner-capacity/root-cause lane; do not create leaf no-op churn | Current-head terminal successful repository + semantic/security checks |
-| Draft lifecycle mutation | GitHub connector | #3/#4/#5 executable with successful exact Tests but Ready mutation still errors on `fullDatabaseId` | Repair connector when that owning surface is available; meanwhile preserve PR state and do not bypass governance | Successful ordinary Ready transition and downstream semantic review dispatch |
+| Draft lifecycle mutation | GitHub connector | #3/#4/#5 executable with successful exact Tests but Ready mutation errors on `fullDatabaseId`; the later #8 Ready attempt also encountered a transient GraphQL rate limit | Retry only when the connector/API is healthy; meanwhile preserve PR state and do not bypass governance | Successful ordinary Ready transition and downstream semantic review dispatch |
 
 ## Quality, security, persistence, and operability invariants
 
@@ -94,8 +94,8 @@ Issue #2 remains the canonical commercialization tracker and must stay open. It 
 
 ## Required development order
 
-1. Reacquire exact-head repository and central semantic/security evidence for #6, #7, and the new #8 while continuing independent work instead of waiting on the runner queue.
-2. Progress #3/#4/#5 to Ready when the connector mutation is repaired; never substitute admin bypass or self-approval.
+1. Reacquire exact-head repository and central semantic/security evidence for #6, #7, and #8 while continuing independent work instead of waiting on the runner queue.
+2. Progress #3/#4/#5 and then #8 to Ready when the connector mutation is healthy; never substitute admin bypass or self-approval.
 3. Establish concrete Keyverse/service authentication and operated recovery/release evidence.
 4. Add the next standards-backed `VTIMEZONE` capability and then CalDAV/provider interoperability fixtures, keeping recurrence/floating semantics explicitly versioned.
 5. Migrate Naruon, `saju-caldav`, and LineageWeave only after released parity evidence exists.
