@@ -34,6 +34,12 @@ The implementation stack is building a tenant-scoped Calendar Resource Core, dur
 - unsupported or not-yet-released capabilities are identified rather than implied;
 - no production endpoint, package, container image, or deployment is advertised from this branch.
 
+### Executable candidate evidence
+
+The implementation branch stacked on the architecture baseline contains a Rust v0.1 application port for tenant-scoped collection creation and strict RFC 5545 VEVENT create, conditional-update, list, and get behavior. It accepts UTC or all-day intervals, preserves standard event status, returns opaque event references with revision/ETag evidence, checks authorization scope before parsing payloads, and fails closed for malformed, cross-tenant, stale-revision, and unsupported requests.
+
+That executable candidate is conformance evidence only. It is not protected-main, a released package or service, durable storage by itself, a CalDAV endpoint, provider parity, or a consumer migration contract.
+
 ## First releasable vertical
 
 The first release target is intentionally small and testable:
@@ -63,7 +69,7 @@ CalendarWeave owns generic calendar resources. Adjacent products retain their ow
 
 | Product | Boundary with CalendarWeave |
 | --- | --- |
-| Naruon | Owns workspace commitment meaning, conflict/resolution policy, approval and buyer workflow; consumes calendar resources through a versioned port/ACL |
+| Naruon | Owns workspace commitment meaning, conflict/resolution policy, approval and customer workflow; consumes calendar resources through a versioned port/ACL |
 | LineageWeave | Owns read-only lineage/evidence composition and deep links; does not own calendar persistence or provider credentials |
 | `saju-caldav` | Owns saju-specific candidate calculation, scoring, explanation and publication intent; its current generic CalDAV path remains compatibility infrastructure until parity is proven |
 | `four-pillars` | Owns deterministic Four Pillars calculation/reporting; that computation stays outside CalendarWeave |
