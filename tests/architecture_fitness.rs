@@ -20,8 +20,8 @@ fn core_has_no_foreign_domain_or_provider_dependency() {
 }
 
 #[test]
-fn first_vertical_does_not_claim_a_network_or_storage_boundary() {
-    for unshipped in ["axum", "actix-web", "sqlx", "diesel", "postgres", "reqwest"] {
+fn durable_vertical_does_not_claim_a_network_or_provider_boundary() {
+    for unshipped in ["axum", "actix-web", "reqwest"] {
         assert!(!MANIFEST.to_ascii_lowercase().contains(unshipped));
     }
 }

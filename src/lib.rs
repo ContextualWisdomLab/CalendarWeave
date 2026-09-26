@@ -10,6 +10,8 @@ use chrono::{NaiveDate, NaiveDateTime};
 use icalendar::{Calendar, CalendarComponent, Component, Property};
 use uuid::Uuid;
 
+pub mod postgres_store;
+
 const ALLOWED_EVENT_PROPERTIES: [&str; 7] = [
     "UID", "DTSTAMP", "DTSTART", "DTEND", "SUMMARY", "SEQUENCE", "STATUS",
 ];
@@ -27,6 +29,8 @@ pub enum CalendarError {
     UnsupportedCapability,
     /// The same UID already identifies different immutable event content.
     StaleRevision,
+    /// Durable storage could not complete the operation safely.
+    StorageUnavailable,
 }
 
 /// A validated tenant scope used for every collection and event operation.
@@ -53,6 +57,10 @@ impl TenantId {
             return Err(CalendarError::InvalidInput);
         }
         Ok(Self(value.to_owned()))
+    }
+
+    pub(crate) fn as_str(&self) -> &str {
+        &self.0
     }
 }
 
@@ -216,13 +224,10 @@ impl CalendarPort for InMemoryCalendarService {
         tenant_id: &TenantId,
         display_name: &str,
     ) -> Result<CalendarCollection, CalendarError> {
-        let display_name = display_name.trim();
-        if display_name.is_empty() || display_name.len() > 200 {
-            return Err(CalendarError::InvalidInput);
-        }
+        let display_name = validated_display_name(display_name)?;
         let collection = CalendarCollection {
             collection_ref: format!("cal_{}", Uuid::new_v4().simple()),
-            display_name: display_name.to_owned(),
+            display_name,
         };
         self.collections.insert(
             collection.collection_ref.clone(),
@@ -339,13 +344,13 @@ impl CalendarPort for InMemoryCalendarService {
     }
 }
 
-struct ParsedEvent {
-    uid: String,
-    summary: String,
-    status: EventStatus,
+pub(crate) struct ParsedEvent {
+    pub(crate) uid: String,
+    pub(crate) summary: String,
+    pub(crate) status: EventStatus,
 }
 
-fn parse_event(input: &str) -> Result<ParsedEvent, CalendarError> {
+pub(crate) fn parse_event(input: &str) -> Result<ParsedEvent, CalendarError> {
     if !input.ends_with("\r\n") || input.replace("\r\n", "").contains('\n') {
         return Err(CalendarError::MalformedCalendar);
     }
@@ -389,6 +394,14 @@ fn parse_event(input: &str) -> Result<ParsedEvent, CalendarError> {
         summary,
         status,
     })
+}
+
+pub(crate) fn validated_display_name(display_name: &str) -> Result<String, CalendarError> {
+    let display_name = display_name.trim();
+    if display_name.is_empty() || display_name.len() > 200 {
+        return Err(CalendarError::InvalidInput);
+    }
+    Ok(display_name.to_owned())
 }
 
 fn validate_singleton_properties(input: &str) -> Result<(), CalendarError> {
