@@ -6,7 +6,8 @@
 use std::collections::{BTreeMap, HashMap};
 use std::str::FromStr;
 
-use chrono::{NaiveDate, NaiveDateTime};
+use chrono::{NaiveDate, NaiveDateTime, TimeZone};
+use chrono_tz::Tz;
 use icalendar::{Calendar, CalendarComponent, Component, Property};
 use uuid::Uuid;
 
@@ -476,9 +477,6 @@ fn validate_interval(
 ) -> Result<(), CalendarError> {
     let start = start.ok_or(CalendarError::MalformedCalendar)?;
     let end = end.ok_or(CalendarError::MalformedCalendar)?;
-    if start.params().contains_key("TZID") || end.params().contains_key("TZID") {
-        return Err(CalendarError::UnsupportedCapability);
-    }
     let start_is_date = start
         .params()
         .get("VALUE")
@@ -491,10 +489,29 @@ fn validate_interval(
         return Err(CalendarError::MalformedCalendar);
     }
     if start_is_date {
+        if start.params().len() != 1 || end.params().len() != 1 {
+            return Err(CalendarError::MalformedCalendar);
+        }
         let start = NaiveDate::parse_from_str(start.value(), "%Y%m%d")
             .map_err(|_| CalendarError::MalformedCalendar)?;
         let end = NaiveDate::parse_from_str(end.value(), "%Y%m%d")
             .map_err(|_| CalendarError::MalformedCalendar)?;
+        return (end > start)
+            .then_some(())
+            .ok_or(CalendarError::MalformedCalendar);
+    }
+    let start_tzid = start.params().get("TZID").map(icalendar::Parameter::value);
+    let end_tzid = end.params().get("TZID").map(icalendar::Parameter::value);
+    if start_tzid.is_some() || end_tzid.is_some() {
+        if start.params().len() != 1 || end.params().len() != 1 || start_tzid != end_tzid {
+            return Err(CalendarError::MalformedCalendar);
+        }
+        let timezone = start_tzid
+            .expect("matching TZID parameters were checked")
+            .parse::<Tz>()
+            .map_err(|_| CalendarError::UnsupportedCapability)?;
+        let start = named_datetime(timezone, start.value())?;
+        let end = named_datetime(timezone, end.value())?;
         return (end > start)
             .then_some(())
             .ok_or(CalendarError::MalformedCalendar);
@@ -508,5 +525,14 @@ fn validate_interval(
         .map_err(|_| CalendarError::UnsupportedCapability)?;
     (end > start)
         .then_some(())
+        .ok_or(CalendarError::MalformedCalendar)
+}
+
+fn named_datetime(timezone: Tz, value: &str) -> Result<chrono::DateTime<Tz>, CalendarError> {
+    let local = NaiveDateTime::parse_from_str(value, "%Y%m%dT%H%M%S")
+        .map_err(|_| CalendarError::MalformedCalendar)?;
+    timezone
+        .from_local_datetime(&local)
+        .single()
         .ok_or(CalendarError::MalformedCalendar)
 }

@@ -8,8 +8,9 @@ The ADR-0002 candidate adds an executable Rust application port and in-memory
 conformance adapter for collection plus strict VEVENT
 create/conditional-update/list/get. The stacked ADR-0003 candidate adds a 3NF
 PostgreSQL store with durable identity, append-only revisions, and row-locked
-ETag updates. Neither changes the protected-main, CalDAV, deployment,
-backup-operation, or consumer-migration evidence boundary above.
+ETag updates. The stacked ADR-0004 candidate adds bounded IANA TZID interval
+validation through the shared parser. None changes the protected-main, CalDAV,
+deployment, backup-operation, or consumer-migration evidence boundary above.
 
 ## Product responsibility
 
