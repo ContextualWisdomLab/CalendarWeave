@@ -2,7 +2,7 @@
 
 ## Snapshot
 
-Protected `main` remains a seed repository with no released CalendarWeave runtime or consumer contract. The active same-repository stack is executable candidate evidence rather than shipped-product evidence: PR #1 defines the ownership/context baseline; PR #3 implements the Rust Calendar Resource Core; PR #4 adds durable PostgreSQL persistence; PR #5 adds bounded IANA `TZID` interval validation.
+Protected `main` remains a seed repository with no released CalendarWeave runtime or consumer contract. PRs #3, #4 and #5 have merged into the open PR #1 branch, which now contains the Rust Calendar Resource Core, PostgreSQL persistence and bounded IANA `TZID` intervals. PRs #6–#9 remain stacked candidates for authorization admission, recovery, `DURATION` and `CLASS`. None of this branch content is shipped-product evidence.
 
 The highest commercialization risks are now release/operability and interoperability gaps, not absence of a core model: external authorization admission, operated backup/recovery, broader RFC 5545/CalDAV capability, privacy/content semantics, versioned packaging/service evidence, and consumer parity/migration remain open.
 
@@ -10,9 +10,9 @@ The highest commercialization risks are now release/operability and interoperabi
 
 | Responsibility | Owner / bounded context | Current evidence |
 | --- | --- | --- |
-| Calendar collections, resources, stable resource identity, revisions and ETags | CalendarWeave / Calendar Resource | PR #3 candidate, Rust application port; not released |
-| Relational durability and concurrency | CalendarWeave / Calendar Resource persistence adapter | PR #4 candidate, 3NF PostgreSQL with append-only revisions and row-locked conditional writes; not operated recovery evidence |
-| RFC 5545 time semantics | CalendarWeave / iCalendar semantics | UTC/all-day in #3; bounded matching IANA `TZID` intervals in #5; `VTIMEZONE`, `DURATION`, floating time and recurrence still unavailable |
+| Calendar collections, resources, stable resource identity, revisions and ETags | CalendarWeave / Calendar Resource | Rust application port from #3 is integrated on PR #1; not released |
+| Relational durability and concurrency | CalendarWeave / Calendar Resource persistence adapter | 3NF PostgreSQL adapter from #4 is integrated on PR #1; operated recovery is a separate candidate in #7 |
+| RFC 5545 time semantics | CalendarWeave / iCalendar semantics | UTC/all-day and bounded matching IANA `TZID` intervals from #3/#5 are integrated on PR #1; `DURATION` is a candidate in #8, while `VTIMEZONE`, floating time and recurrence remain unavailable |
 | CalDAV/provider interoperability and synchronization | CalendarWeave / interoperability adapters | Target responsibility; no released endpoint/provider-parity evidence |
 | Workspace commitment/conflict/resolution policy | Naruon | Stays outside CalendarWeave behind a versioned CalendarPort/ACL |
 | Calendar/evidence composition | LineageWeave | Read-model/evidence responsibility only; no CalendarWeave persistence ownership |
@@ -26,10 +26,9 @@ Core subdomain: governed calendar-resource semantics and mutation/revision invar
 
 | Lane | Exact evidence at this update | Status / next verification |
 | --- | --- | --- |
-| PR #1 `docs/adr-baseline` | `d9393fd7e4e6e3ad72d0f09acdf656d6569555f6` | Architecture/ADR parent; Draft, no released runtime claim |
-| PR #3 `feat/calendar-resource-core-v1` | runner repair predecessor `d415d835068891dea028210d9ff3f602f60b15dd` | Repository `Tests` completed success after pinning both jobs to `ubuntu-24.04`; this documentation commit must reacquire exact-head evidence |
-| PR #4 `feat/postgres-calendar-store-v1` | `da35a30fe9a9f5902d4e7fd795fd01a0ce560378` | Current parent propagation includes PostgreSQL services plus explicit Ubuntu 24.04 runners; exact-head Tests are required |
-| PR #5 `feat/tzid-calendar-interval-v1` | `0aadc06f15c550c9b117d3a30bf156326cb63dcb` | Current parent propagation includes bounded `TZID`; exact-head Tests are required |
+| PR #1 `docs/adr-baseline` | PRs #3/#4/#5 merged into this branch | Executable core, PostgreSQL and bounded `TZID` are integrated but not on protected `main`; exact-head required checks and review govern its merge |
+| PRs #3/#4/#5 | Closed and merged into PR #1 branch | Their successful exact-head Rust and coverage checks supported branch integration; PR #1 needs its own checks before protected-main merge |
+| PRs #6/#7/#8/#9 | Open candidate stack, with #6 based on PR #1 | Authorization admission, recovery, `DURATION` and `CLASS` are not yet integrated into PR #1; new-head hosted checks are pending |
 | Central runner cause | ContextualWisdomLab/.github #1618 merged | Organization evidence proved floating `ubuntu-latest` jobs could remain `runner_id=0` while explicit Ubuntu 24.04 executed; CalendarWeave now has a permanent local selector regression |
 
 The observed pre-fix CalendarWeave job state was queued with `runner_id=0`, empty runner name and zero executed steps. The repaired #3 exact predecessor acquired GitHub-hosted Ubuntu 24.04 runners and completed Rust, tests, rustdoc and 100% line/branch coverage gates successfully. No predecessor-head check or review transfers to a later head.
@@ -38,9 +37,9 @@ The observed pre-fix CalendarWeave job state was queued with `runner_id=0`, empt
 
 | Gap | Owner | Evidence | Action | Acceptance / next verification |
 | --- | --- | --- | --- | --- |
-| External authorization admission | CalendarWeave #2 | Core receives scoped tenant identity but is not an authenticated service | Define admission port/ACL consuming Keyverse-scoped identity; add tenant/authorization edge cases | Unauthorized/cross-tenant behavior proven through executable service boundary without local IdP duplication |
-| Operated durability | CalendarWeave #2 / ADR-0003 | PostgreSQL restart and concurrency candidate exists | Add backup/restore, migration rollback and failure-recovery evidence | Recovery drill preserves collection/event/revision invariants and documented RPO/RTO assumptions |
-| RFC 5545 capability parity | CalendarWeave #2 / ADR-0004 | Bounded IANA `TZID` support exists | Add standards-backed `DURATION`/`VTIMEZONE` slices test-first; keep unsupported recurrence/floating semantics fail-closed | RFC fixtures and edge cases pass at 100% owned statement/branch coverage |
+| External authorization admission | CalendarWeave #2 | Core receives scoped tenant identity but is not an authenticated service; PR #6 is an external-admission candidate | Validate PR #6 against hosted gates, then add a real trusted identity/policy adapter and audit evidence | Unauthorized/cross-tenant behavior proven through executable service boundary without local IdP duplication |
+| Operated durability | CalendarWeave #2 / ADR-0003 | PostgreSQL restart and concurrency candidate exists; PR #7 adds a logical restore drill | Validate PR #7, then add backup-store operations, migration rollback and failure-recovery evidence | Recovery drill preserves collection/event/revision invariants and documented RPO/RTO assumptions |
+| RFC 5545 capability parity | CalendarWeave #2 / ADR-0004 | Bounded IANA `TZID` support exists; PRs #8/#9 carry `DURATION` and `CLASS` candidates | Validate those slices, add standards-backed `VTIMEZONE` test-first, and keep unsupported recurrence/floating semantics fail-closed | RFC fixtures and edge cases pass at 100% owned statement/branch coverage |
 | CalDAV/provider parity | CalendarWeave #2 | No CalDAV endpoint or provider adapter is shipped | Introduce protocol/application ACLs only after core contracts stabilize | Real interoperability fixtures plus reversible consumer migration proof |
 | Privacy/content semantics | CalendarWeave #2 | Calendar text may contain PII; no operated policy evidence | Document purpose, retention, access/audit and non-masking boundary where masking breaks calendar work | CSAP/SOC 2 design controls mapped without claiming certification; tests/docs anonymize real persons/institutions |
 | Release/package/service contract | CalendarWeave #2 | No versioned release/package/container/service | Define versioned public port, compose deployability, SBOM/provenance and rollback | Immutable release artifact/service plus compatibility policy and install/call path |
