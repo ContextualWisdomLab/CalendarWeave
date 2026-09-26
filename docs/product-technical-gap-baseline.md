@@ -2,7 +2,7 @@
 
 ## Snapshot
 
-Protected `main` remains the seed commit `d972ccae6225716bdff7210a1fed808c01d32689`; CalendarWeave still has no released runtime, package, service, container, CalDAV endpoint, or consumer migration. The active same-repository stack is candidate evidence: PR #1 architecture/ownership, #3 Rust Calendar Resource Core, #4 PostgreSQL persistence, #5 bounded IANA `TZID`, #6 authorization admission, #7 logical recovery, and #8 bounded RFC 5545 `DURATION` interoperability.
+Protected `main` remains the seed commit `d972ccae6225716bdff7210a1fed808c01d32689`; CalendarWeave still has no released runtime, package, service, container, CalDAV endpoint, or consumer migration. PRs #3/#4/#5 have merged into the open PR #1 branch, which now carries the Rust core, PostgreSQL adapter and bounded IANA `TZID`. PR #6 authorization admission, #7 logical recovery, #8 bounded RFC 5545 `DURATION`, and #9 `CLASS` remain stacked candidates.
 
 The repository remains genuinely early-stage because the buyer-facing workflow is not installable or operated and foundational service authentication, release/deployment, CalDAV/provider parity, privacy/audit operation, measured recovery, and downstream migration are still missing. The bounded `DURATION` slice materially narrows a real producer-interoperability gap without widening the product boundary.
 
@@ -10,10 +10,10 @@ The repository remains genuinely early-stage because the buyer-facing workflow i
 
 | Responsibility | Owner / bounded context | Current evidence |
 | --- | --- | --- |
-| Calendar collections, events, UID/revision/ETag invariants, RFC 5545 resource semantics | CalendarWeave / Calendar Resource Core | PR #3 plus stacked #5/#8 candidates; not released |
+| Calendar collections, events, UID/revision/ETag invariants, RFC 5545 resource semantics | CalendarWeave / Calendar Resource Core | PR #3/#5 content is integrated on PR #1; PR #8 is a later `DURATION` candidate; none is released |
 | Calendar operation admission | CalendarWeave / Authorization Admission | PR #6 candidate; tenant-free issuer/subject evidence, exact resource request, authorization-derived tenant |
 | Identity/federation and external authorization policy | Keyverse | External authority behind `CalendarAuthorizationPort`; no copied identity/policy store |
-| Relational durability/concurrency | CalendarWeave / PostgreSQL adapter | PR #4 candidate, 3NF append-only revisions and row-locked conditional updates |
+| Relational durability/concurrency | CalendarWeave / PostgreSQL adapter | PR #4 content is integrated on PR #1, with 3NF append-only revisions and row-locked conditional updates |
 | Logical recovery | CalendarWeave / operations boundary | PR #7 candidate; checksum-before-restore and invariant drill, not PITR/HA/RPO/RTO evidence |
 | CalDAV/provider interoperability and synchronization | CalendarWeave / interoperability adapters | Target responsibility; no released endpoint/provider parity |
 | Workspace commitment/conflict/resolution policy | Naruon | Supporting consumer context behind a versioned Calendar Port/ACL |
@@ -45,14 +45,13 @@ Persistence remains 3NF with descriptive multiword `snake_case` objects: `calend
 | Lane | Exact evidence observed in this iteration | Status / next verification |
 | --- | --- | --- |
 | protected `main` | `d972ccae6225716bdff7210a1fed808c01d32689` | Seed only; protected by active organization required-workflow/review ruleset |
-| PR #1 `docs/adr-baseline` | `d9393fd7e4e6e3ad72d0f09acdf656d6569555f6` | Draft architecture parent; exact SAST/Security runs observed queued; documentation is not executable-product completion evidence |
-| PR #3 `feat/calendar-resource-core-v1` | `e4d3defec07fa00cd909ed676ea88c5c898d32db` | Exact repository `Tests` run `33532894750` completed success; Draft→Ready mutation was retried live and is blocked by connector GraphQL `Repository.fullDatabaseId` schema failure |
-| PR #4 `feat/postgres-calendar-store-v1` | `77f8b66560c999385eae90ff038643e2e948fabf` | Exact `Tests` run `33532977605` completed success; same live Ready-mutation connector failure |
-| PR #5 `feat/tzid-calendar-interval-v1` | `b68a1c566f0fee520459f297a2f94a2ffa5bac24` | Exact `Tests` run `33533050155` completed success; same live Ready-mutation connector failure |
-| PR #6 `feat/authorization-admission-v1` | `9b3500633b4b7c7a9ac1e43dda10140ec0f1aedc` | Open/non-Draft/mergeable; exact `Tests` run `33563830224` still queued; unresolved review thread correctly remains open because it asks for hosted exact-head check evidence |
-| PR #7 `feat/postgres-recovery-v1` | `1473e0ae8e9ddbe3343190941f6125dbcac03bcc` | Draft/mergeable; exact `Tests` run `33569539054` still queued; recovery cannot be promoted without execution evidence |
-| PR #8 `feat/rfc5545-duration-v1` | pre-baseline head `7e356a6f4eaa0fb60722b23e6c9953fcdea9df02`; this baseline commit advances the head | Test-first DURATION lane; exact-head `Tests` run `33580394726` had rust/coverage/recovery all queued with zero steps and no assigned runner, so it becomes historical after this commit; re-read the new exact head and reacquire checks/reviews |
-| Central runner acquisition | ContextualWisdomLab/.github #712 | Current organization-level queue evidence continues to show explicit Ubuntu jobs unassigned; do not rewrite leaf runner selectors or claim queued as passing |
+| PR #1 `docs/adr-baseline` | PRs #3/#4/#5 merged into this branch | Executable core, PostgreSQL and bounded `TZID` are integrated but not on protected `main`; required checks and review govern its merge |
+| PRs #3/#4/#5 | Closed and merged into PR #1 branch | Their successful exact-head Rust and coverage checks supported branch integration; PR #1 needs its own checks before protected-main merge |
+| PR #6 `feat/authorization-admission-v1` | Open candidate based on PR #1 | Current-head hosted checks and semantic review remain required; the open review thread requests hosted check evidence |
+| PR #7 `feat/postgres-recovery-v1` | Open candidate stacked after #6 | The RED recovery contract preceded production scripts; current-head rust, coverage and recovery checks remain required |
+| PR #8 `feat/rfc5545-duration-v1` | Open candidate stacked after #7 | Test-first `DURATION` lane; current-head rust, coverage and recovery checks remain required |
+| PR #9 `feat/rfc5545-class-v1` | Open candidate stacked after #8 | `CLASS` privacy intent is not an authorization decision; current-head checks and review remain required |
+| Central runner acquisition | ContextualWisdomLab/.github #712 | Organization-level queue evidence has shown explicit Ubuntu jobs unassigned; do not rewrite leaf runner selectors or claim queued as passing |
 
 The live CalendarWeave organization ruleset requires an approving review, stale-review dismissal, review-thread resolution, and central required workflows on the protected default branch. No self-approval, admin bypass, required-check weakening, force-push, or destructive rebase is permitted for commercialization progress.
 
@@ -77,8 +76,8 @@ Issue #2 remains the canonical commercialization tracker and must stay open. It 
 | Privacy/content + authorization audit | CalendarWeave + deployment | Calendar text and backup artifacts may contain necessary PII | Define purpose/retention/access/export/audit controls and encrypted backup access | CSAP/SOC 2-oriented control map and operated evidence without certification claims |
 | Release/package/service | CalendarWeave | No versioned public artifact | Define package/service contract, compose deployment, SBOM/provenance, rollback | Immutable versioned artifact/service plus real install/call path |
 | Consumer migration | Naruon / `saju-caldav` / LineageWeave | Compatibility implementations remain | Characterization tests then versioned ACLs after release | No direct table coupling; parity/security/failure semantics and reversible cutover |
-| Hosted exact-head verification | ContextualWisdomLab/.github #712 | #6/#7/#8 jobs queued/unassigned | Continue central runner-capacity/root-cause lane; do not create leaf no-op churn | Current-head terminal successful repository + semantic/security checks |
-| Draft lifecycle mutation | GitHub connector | #3/#4/#5 executable with successful exact Tests but Ready mutation errors on `fullDatabaseId`; the later #8 Ready attempt also encountered a transient GraphQL rate limit | Retry only when the connector/API is healthy; meanwhile preserve PR state and do not bypass governance | Successful ordinary Ready transition and downstream semantic review dispatch |
+| Hosted exact-head verification | ContextualWisdomLab/.github #712 | #6/#7/#8 require current-head hosted execution | Continue central runner-capacity/root-cause lane; do not create leaf no-op churn | Current-head terminal successful repository + semantic/security checks |
+| Review lifecycle | CalendarWeave PR stack | #3/#4/#5 were marked Ready through the CLI and merged into PR #1; #6/#7/#8 remain Draft | Advance each executable candidate only with current-head checks and review evidence | Ordinary Ready transition and downstream semantic review dispatch without bypass |
 
 ## Quality, security, persistence, and operability invariants
 
@@ -95,7 +94,7 @@ Issue #2 remains the canonical commercialization tracker and must stay open. It 
 ## Required development order
 
 1. Reacquire exact-head repository and central semantic/security evidence for #6, #7, and #8 while continuing independent work instead of waiting on the runner queue.
-2. Progress #3/#4/#5 and then #8 to Ready when the connector mutation is healthy; never substitute admin bypass or self-approval.
+2. Review PR #1's integrated core and advance #6/#7/#8 only after their current-head checks; never substitute admin bypass or self-approval.
 3. Establish concrete Keyverse/service authentication and operated recovery/release evidence.
 4. Add the next standards-backed `VTIMEZONE` capability and then CalDAV/provider interoperability fixtures, keeping recurrence/floating semantics explicitly versioned.
 5. Migrate Naruon, `saju-caldav`, and LineageWeave only after released parity evidence exists.
