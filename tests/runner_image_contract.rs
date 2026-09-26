@@ -25,7 +25,9 @@ fn tests_workflow_uses_explicit_ubuntu_24_04_runners() {
 #[test]
 fn tests_workflow_cancels_superseded_exact_heads() {
     assert!(
-        TESTS_WORKFLOW.contains("group: calendarweave-tests-${{ github.event.pull_request.number || github.ref }}"),
+        TESTS_WORKFLOW.contains(
+            "group: calendarweave-tests-${{ github.event.pull_request.number || github.ref }}"
+        ),
         "Tests must group runs by PR (or protected push ref) so a newer exact head supersedes older work"
     );
     assert!(
