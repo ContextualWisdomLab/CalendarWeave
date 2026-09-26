@@ -23,9 +23,9 @@ Calendar systems become difficult to integrate when resource identity, revisions
 
 ## Current status
 
-CalendarWeave is under active foundation development. The protected default branch is still a seed repository; this documentation branch defines the product boundary and migration contract, not a released runtime.
+CalendarWeave is under active foundation development. Protected `main` is still a seed repository. This pull-request branch now carries an executable Rust core, PostgreSQL adapter, and bounded timezone behavior, but none is released or available as a supported service.
 
-The implementation stack is building a tenant-scoped Calendar Resource Core, durable persistence, and strict RFC 5545 time semantics before any production service, CalDAV endpoint, provider parity, or consumer-migration claim is made. Candidate behavior in open pull requests is not protected-main or release evidence.
+The implementation stack is building a tenant-scoped Calendar Resource Core, durable persistence, and strict RFC 5545 time semantics before any production service, CalDAV endpoint, provider parity, or consumer-migration claim is made. Candidate behavior on this branch and its open successors is not protected-main or release evidence.
 
 ### What you can rely on today
 
