@@ -1,3 +1,5 @@
+//! Authorization admission contract tests.
+
 use calendarweave::admission::{
     AuthorizationError, AuthorizedCalendarService, CalendarAction, CalendarAuthorizationPort,
     CalendarAuthorizationRequest, ExternalIdentity,
@@ -218,10 +220,8 @@ fn resource_context_reaches_authorization_before_domain_lookup() {
 
 #[test]
 fn authorization_request_exposes_exact_resource_context() {
-    let mut service = AuthorizedCalendarService::new(
-        InspectingAuthorization,
-        InMemoryCalendarService::new(),
-    );
+    let mut service =
+        AuthorizedCalendarService::new(InspectingAuthorization, InMemoryCalendarService::new());
     let identity = identity("customer-user-01");
 
     assert_eq!(
@@ -254,7 +254,9 @@ impl CalendarAuthorizationPort for InspectingAuthorization {
 
 #[test]
 fn external_identity_validation_is_bounded_and_opaque() {
-    assert!(ExternalIdentity::parse("https://identity.example.test", "subject with spaces").is_ok());
+    assert!(
+        ExternalIdentity::parse("https://identity.example.test", "subject with spaces").is_ok()
+    );
     assert_eq!(
         ExternalIdentity::parse("", "subject-01"),
         Err(CalendarError::InvalidInput)
@@ -275,16 +277,10 @@ fn external_identity_validation_is_bounded_and_opaque() {
 
 #[test]
 fn issuer_and_subject_jointly_identify_the_external_principal() {
-    let first = ExternalIdentity::parse(
-        "https://identity.example.test",
-        "customer-user-01",
-    )
-    .expect("identity fixture is valid");
-    let second = ExternalIdentity::parse(
-        "https://other-identity.example.test",
-        "customer-user-01",
-    )
-    .expect("identity fixture is valid");
+    let first = ExternalIdentity::parse("https://identity.example.test", "customer-user-01")
+        .expect("identity fixture is valid");
+    let second = ExternalIdentity::parse("https://other-identity.example.test", "customer-user-01")
+        .expect("identity fixture is valid");
 
     assert_ne!(first, second);
 }
@@ -295,25 +291,21 @@ fn authorized_tenant_is_derived_by_the_policy_adapter_not_the_caller() {
         StubAuthorization::allow_all(),
         InMemoryCalendarService::new(),
     );
-    let tenant_a_identity = identity("customer-user-01");
-    let tenant_b_identity = identity("customer-user-02");
+    let creator = identity("customer-user-01");
+    let outsider = identity("customer-user-02");
     let collection = service
-        .create_collection(&tenant_a_identity, "Customer calendar")
+        .create_collection(&creator, "Customer calendar")
         .expect("collection creation succeeds");
     let created = service
-        .create_event(&tenant_a_identity, &collection.collection_ref, EVENT)
+        .create_event(&creator, &collection.collection_ref, EVENT)
         .expect("event creation succeeds");
 
     assert_eq!(
-        service.get_event(
-            &tenant_b_identity,
-            &collection.collection_ref,
-            &created.event_ref,
-        ),
+        service.get_event(&outsider, &collection.collection_ref, &created.event_ref),
         Err(CalendarError::NotFound)
     );
     assert_eq!(
-        service.list_events(&tenant_b_identity, &collection.collection_ref),
+        service.list_events(&outsider, &collection.collection_ref),
         Err(CalendarError::NotFound)
     );
 }

@@ -1,4 +1,4 @@
-//! RFC 5545 CLASS privacy contracts for CalendarWeave consumer parity.
+//! RFC 5545 CLASS privacy contracts for `CalendarWeave` consumer parity.
 
 use calendarweave::{
     CalendarError, CalendarEvent, CalendarPort, EventClass, InMemoryCalendarService, TenantId,
@@ -66,7 +66,10 @@ fn class_is_singleton_and_rejects_non_token_values() {
 fn classification_accessor_fails_closed_for_a_forged_projection() {
     let mut event = create_event(&payload(Some("CLASS:PRIVATE"))).expect("valid test event");
     event.icalendar = payload(Some("CLASS:NOT PRIVATE"));
-    assert_eq!(event.classification(), Err(CalendarError::MalformedCalendar));
+    assert_eq!(
+        event.classification(),
+        Err(CalendarError::MalformedCalendar)
+    );
 }
 
 #[test]

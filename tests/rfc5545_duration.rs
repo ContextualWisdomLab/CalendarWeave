@@ -1,4 +1,4 @@
-//! RFC 5545 DURATION profile contracts for bounded CalendarWeave VEVENTs.
+//! RFC 5545 DURATION profile contracts for bounded `CalendarWeave` VEVENTs.
 
 use calendarweave::{
     CalendarError, CalendarEvent, CalendarPort, InMemoryCalendarService, TenantId,
@@ -27,10 +27,7 @@ fn positive_duration_is_an_interval_alternative_to_dtend() {
         payload("DTSTART:20260902T090000Z", "DURATION:+PT1H0M0S"),
         payload("DTSTART:20260902T090000Z", "DURATION:P15DT5H0M20S"),
         payload("DTSTART:20260902T090000Z", "DURATION:P1DT1H30S"),
-        payload(
-            "DTSTART;TZID=Asia/Seoul:20260902T090000",
-            "DURATION:P1DT2H",
-        ),
+        payload("DTSTART;TZID=Asia/Seoul:20260902T090000", "DURATION:P1DT2H"),
         payload("DTSTART;VALUE=DATE:20260902", "DURATION:P1D"),
         payload("DTSTART;VALUE=DATE:20260902", "DURATION:P2W"),
     ] {
@@ -86,10 +83,7 @@ fn duration_must_be_positive_and_match_the_rfc5545_duration_grammar() {
 #[test]
 fn date_start_accepts_only_day_or_week_duration_shapes() {
     for value in ["PT24H", "P1DT1H", "PT30M"] {
-        let input = payload(
-            "DTSTART;VALUE=DATE:20260902",
-            &format!("DURATION:{value}"),
-        );
+        let input = payload("DTSTART;VALUE=DATE:20260902", &format!("DURATION:{value}"));
         assert_eq!(
             create_event(&input),
             Err(CalendarError::MalformedCalendar),
@@ -120,10 +114,7 @@ fn duration_reuses_named_timezone_start_fail_closed_semantics() {
 
 #[test]
 fn duration_parameters_remain_outside_the_bounded_v1_profile() {
-    let input = payload(
-        "DTSTART:20260902T090000Z",
-        "DURATION;X-SYNTHETIC=1:PT1H",
-    );
+    let input = payload("DTSTART:20260902T090000Z", "DURATION;X-SYNTHETIC=1:PT1H");
     assert_eq!(
         create_event(&input),
         Err(CalendarError::UnsupportedCapability)

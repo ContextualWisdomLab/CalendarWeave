@@ -15,15 +15,7 @@ pub mod admission;
 pub mod postgres_store;
 
 const ALLOWED_EVENT_PROPERTIES: [&str; 9] = [
-    "UID",
-    "DTSTAMP",
-    "DTSTART",
-    "DTEND",
-    "DURATION",
-    "SUMMARY",
-    "SEQUENCE",
-    "STATUS",
-    "CLASS",
+    "UID", "DTSTAMP", "DTSTART", "DTEND", "DURATION", "SUMMARY", "SEQUENCE", "STATUS", "CLASS",
 ];
 
 /// A bounded failure returned by the calendar-resource application port.
@@ -452,9 +444,7 @@ pub(crate) fn validated_display_name(display_name: &str) -> Result<String, Calen
 }
 
 fn validate_singleton_properties(input: &str) -> Result<(), CalendarError> {
-    const REQUIRED_ONCE: [&str; 6] = [
-        "VERSION", "PRODID", "UID", "DTSTAMP", "DTSTART", "SUMMARY",
-    ];
+    const REQUIRED_ONCE: [&str; 6] = ["VERSION", "PRODID", "UID", "DTSTAMP", "DTSTART", "SUMMARY"];
     for required in REQUIRED_ONCE {
         if property_count(input, required) != 1 {
             return Err(CalendarError::MalformedCalendar);
@@ -609,10 +599,7 @@ fn validate_dtend_interval(start: &Property, end: &Property) -> Result<(), Calen
         .ok_or(CalendarError::MalformedCalendar)
 }
 
-fn validate_duration_interval(
-    start: &Property,
-    duration: &Property,
-) -> Result<(), CalendarError> {
+fn validate_duration_interval(start: &Property, duration: &Property) -> Result<(), CalendarError> {
     if !duration.params().is_empty() {
         return Err(CalendarError::UnsupportedCapability);
     }
@@ -678,8 +665,7 @@ fn positive_duration(value: &str, date_only: bool) -> bool {
     let Some((days, time)) = body.split_once("DT") else {
         return false;
     };
-    let day_nonzero =
-        digits(days).is_some_and(|digits| digits.bytes().any(|digit| digit != b'0'));
+    let day_nonzero = digits(days).is_some_and(|digits| digits.bytes().any(|digit| digit != b'0'));
     let Some(time_nonzero) = duration_time_nonzero(time) else {
         return false;
     };
