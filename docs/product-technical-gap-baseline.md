@@ -2,7 +2,7 @@
 
 ## Snapshot
 
-Protected `main` remains the seed `d972ccae6225716bdff7210a1fed808c01d32689`; the live repository is non-fork and protected main still contains no released runtime, package, service, container, CalDAV endpoint, provider adapter, or consumer migration. The current candidate stack is PR #1 architecture/ownership, #3 Rust Calendar Resource Core, #4 PostgreSQL persistence, #5 bounded IANA `TZID`, #6 authorization admission, #7 logical recovery, #8 bounded RFC 5545 `DURATION`, and #9 RFC 5545 `CLASS` privacy intent.
+Protected `main` remains the seed `d972ccae6225716bdff7210a1fed808c01d32689`; the live repository is non-fork and protected main still contains no released runtime, package, service, container, CalDAV endpoint, provider adapter, or consumer migration. PRs #3/#4/#5 have merged into the open PR #1 branch, which now carries the Rust core, PostgreSQL adapter and bounded IANA `TZID`. PR #6 authorization admission, #7 logical recovery, #8 bounded RFC 5545 `DURATION`, and #9 RFC 5545 `CLASS` privacy intent remain stacked candidates.
 
 CalendarWeave remains genuinely very early-stage because the buyer-facing workflow is not installable or operated and foundational service authentication, release/deployment, CalDAV/provider parity, privacy/audit operation, measured recovery, and downstream migration are still missing. PR #9 is a bounded commercialization intervention because `saju-caldav` parity explicitly needs privacy-classification semantics and RFC 5545 provides a standard contract that can be added without widening CalendarWeave into disclosure policy.
 
@@ -10,11 +10,11 @@ CalendarWeave remains genuinely very early-stage because the buyer-facing workfl
 
 | Responsibility | Owner / bounded context | Current evidence |
 | --- | --- | --- |
-| Calendar collections, events, UID/revision/ETag invariants, RFC 5545 resource semantics | CalendarWeave / Calendar Resource Core | #3 plus stacked #5/#8/#9 candidates; not released |
+| Calendar collections, events, UID/revision/ETag invariants, RFC 5545 resource semantics | CalendarWeave / Calendar Resource Core | #3/#5 content is integrated on PR #1; #8/#9 are later semantic candidates; none is released |
 | Calendar privacy intent | CalendarWeave / Calendar Resource Core | #9 `EventClass` projection from canonical iCalendar; not authorization |
 | Calendar operation admission | CalendarWeave / Authorization Admission | #6 candidate; tenant-free issuer/subject evidence, exact resource request, authorization-derived tenant |
 | Identity/federation and external authorization policy | Keyverse | External authority behind `CalendarAuthorizationPort`; no copied identity/policy store |
-| Relational durability/concurrency | CalendarWeave / PostgreSQL adapter | #4 candidate, 3NF append-only revisions and row-locked conditional updates |
+| Relational durability/concurrency | CalendarWeave / PostgreSQL adapter | #4 content is integrated on PR #1, with 3NF append-only revisions and row-locked conditional updates |
 | Logical recovery | CalendarWeave / operations boundary | #7 candidate; checksum-before-restore and invariant drill, not PITR/HA/RPO/RTO evidence |
 | CalDAV/provider interoperability and synchronization | CalendarWeave / interoperability adapters | Target responsibility; no released endpoint/provider parity |
 | Workspace commitment/conflict/resolution policy | Naruon | Supporting consumer context behind a versioned Calendar Port/ACL |
@@ -47,17 +47,15 @@ Persistence remains 3NF with descriptive multiword `snake_case` objects: `calend
 | Lane | Exact head / evidence | Current status / next verification |
 | --- | --- | --- |
 | protected `main` | `d972ccae6225716bdff7210a1fed808c01d32689` | seed only; no released product surface |
-| #1 `docs/adr-baseline` | `d9393fd7e4e6e3ad72d0f09acdf656d6569555f6` | open Draft architecture parent; documentation is not executable completion evidence |
-| #3 `feat/calendar-resource-core-v1` | `e4d3defec07fa00cd909ed676ea88c5c898d32db` | predecessor exact repository Tests were terminal success; Ready transition was retried in this iteration and is currently blocked by GitHub GraphQL rate limiting, not bypassed |
-| #4 `feat/postgres-calendar-store-v1` | `77f8b66560c999385eae90ff038643e2e948fabf` | exact repository Tests previously terminal success; preserve stack order and reacquire lifecycle mutation when API is healthy |
-| #5 `feat/tzid-calendar-interval-v1` | `b68a1c566f0fee520459f297a2f94a2ffa5bac24` | exact repository Tests previously terminal success; preserve stack order and ordinary review gates |
-| #6 `feat/authorization-admission-v1` | `9b3500633b4b7c7a9ac1e43dda10140ec0f1aedc` | live REST confirms open/non-Draft exact head; Tests run `33563830224` remains queued, so no pass is claimed |
-| #7 `feat/postgres-recovery-v1` | `1473e0ae8e9ddbe3343190941f6125dbcac03bcc` | live REST confirms open Draft exact head; recovery/rust/coverage exact-head jobs remain required and queued/unassigned |
-| #8 `feat/rfc5545-duration-v1` | `7521b6b39170c29b71d11fc90d48e9000f7bcce8` | live REST confirms open Draft exact head; current-head Tests remains required before Ready/merge progression |
-| #9 `feat/rfc5545-class-v1` | pre-baseline exact head `059b76ab7185b68df1dacb44805f337a7cd7af24`; this baseline commit advances the head | RED-first CLASS implementation plus forged-projection hardening and synchronized ADR/research/architecture/product docs; exact-head checks must regenerate after this commit |
+| #1 `docs/adr-baseline` | PRs #3/#4/#5 merged into this branch | Executable core, PostgreSQL and bounded `TZID` are integrated but not on protected `main`; required checks and review govern its merge |
+| PRs #3/#4/#5 | Closed and merged into PR #1 branch | Their successful exact-head Rust and coverage checks supported branch integration; PR #1 needs its own checks before protected-main merge |
+| #6 `feat/authorization-admission-v1` | Open candidate based on PR #1 | Current-head hosted checks and semantic review remain required; the open review thread requests hosted check evidence |
+| #7 `feat/postgres-recovery-v1` | Open candidate stacked after #6 | RED recovery contract preceded production scripts; current-head rust, coverage and recovery checks remain required |
+| #8 `feat/rfc5545-duration-v1` | Open candidate stacked after #7 | Test-first `DURATION` lane; current-head rust, coverage and recovery checks remain required |
+| #9 `feat/rfc5545-class-v1` | Open candidate stacked after #8 | RED-first `CLASS` implementation and forged-projection hardening; current-head checks and review remain required |
 | central runner acquisition | ContextualWisdomLab/.github #712 | current central evidence identifies avoidable COMMENTED-review scheduler wakeups as one causal queue-amplification defect; do not churn leaf heads or declare queued jobs passing |
 
-The live governance path requires exact-current-head checks/reviews. This run attempted the safe Draft→Ready transition for #3; the GraphQL API returned a rate-limit error, so no repeated mutation storm, self-approval, admin bypass, or protection weakening was used.
+The live governance path requires exact-current-head checks/reviews. PRs #3/#4/#5 were marked Ready through the CLI and merged into PR #1 without self-approval, admin bypass or protection weakening.
 
 ## PR #9 TDD and research traceability
 
@@ -85,7 +83,7 @@ Issue #2 remains the canonical commercialization tracker and stays open. #9 addr
 | Release/package/service | CalendarWeave | no versioned artifact | define package/service contract, compose deployment, SBOM/provenance and rollback | immutable versioned artifact/service plus real install/call path |
 | Consumer migration | Naruon / `saju-caldav` / LineageWeave | compatibility implementations remain | characterization tests then versioned ACLs after release | parity/security/failure semantics, no direct table coupling, reversible cutover |
 | Hosted exact-head verification | ContextualWisdomLab/.github #712 | CalendarWeave #6/#7/#8/#9 runner-backed jobs can remain queued/unassigned | repair central queue-amplification owner path and revalidate unchanged leaf heads | terminal current-head repository + semantic/security evidence |
-| Draft lifecycle mutation | GitHub API/control plane | #3/#4/#5 are mechanically mature enough for review dispatch but mutation is currently rate-limited | retry once API health returns, without bypass or no-op churn | ordinary Ready state and downstream independent review dispatch |
+| Review lifecycle | CalendarWeave PR stack | #3/#4/#5 were marked Ready through the CLI and merged into PR #1; #6/#7/#8/#9 remain Draft | advance each executable candidate with current-head checks and review evidence, without bypass or no-op churn | ordinary Ready state and downstream independent review dispatch |
 
 ## Quality, security, persistence and operability invariants
 
@@ -102,7 +100,7 @@ Issue #2 remains the canonical commercialization tracker and stays open. #9 addr
 ## Required development order
 
 1. Reacquire exact-head repository and semantic/security evidence for #6/#7/#8/#9 while independently reducing real product gaps.
-2. Transition #3/#4/#5 to Ready when GitHub GraphQL mutation health permits; preserve stack order and ordinary review gates.
+2. Review PR #1's integrated core and advance #6/#7/#8/#9 only after their current-head checks; preserve stack order and ordinary review gates.
 3. Repair the central queue-amplification owner path without leaf churn, then revalidate unchanged CalendarWeave heads.
 4. Establish concrete Keyverse/service authentication and operated recovery/release evidence.
 5. Add the next standards-backed `VTIMEZONE` capability, then CalDAV/provider interoperability fixtures.
