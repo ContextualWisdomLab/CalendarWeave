@@ -86,7 +86,7 @@ CALENDARWEAVE_BACKUP_PATH="$backup_path" \
 PG_RESTORE_BIN="$tmp_dir/pg_restore" \
 bash "$restore_script"
 
-restored="$(docker exec "$postgres_container" psql "$restore_url" -At -v ON_ERROR_STOP=1 <<'SQL'
+restored="$(docker exec -i "$postgres_container" psql "$restore_url" -At -v ON_ERROR_STOP=1 <<'SQL'
 SELECT concat_ws('|',
     c.tenant_reference,
     c.collection_reference,
@@ -108,7 +108,7 @@ SQL
 
 # The restored schema must preserve item-level idempotency and current-revision
 # referential integrity rather than only recovering payload rows.
-constraint_count="$(docker exec "$postgres_container" psql "$restore_url" -At -v ON_ERROR_STOP=1 <<'SQL'
+constraint_count="$(docker exec -i "$postgres_container" psql "$restore_url" -At -v ON_ERROR_STOP=1 <<'SQL'
 SELECT count(*)
 FROM pg_constraint
 WHERE conname IN (
@@ -129,7 +129,7 @@ if CALENDARWEAVE_RESTORE_DATABASE_URL="$tamper_url" \
     exit 1
 fi
 
-tamper_table_count="$(docker exec "$postgres_container" psql "$tamper_url" -At -v ON_ERROR_STOP=1 <<'SQL'
+tamper_table_count="$(docker exec -i "$postgres_container" psql "$tamper_url" -At -v ON_ERROR_STOP=1 <<'SQL'
 SELECT count(*)
 FROM information_schema.tables
 WHERE table_schema = 'public'
