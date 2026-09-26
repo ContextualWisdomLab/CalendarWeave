@@ -36,7 +36,7 @@ pub enum CalendarAction {
 
 /// Externally verified principal identity before tenant authorization.
 ///
-/// Issuer and subject are retained together because an OpenID Connect subject
+/// Issuer and subject are retained together because an `OpenID` Connect subject
 /// is only unique within its issuer. The value contains no tenant scope: the
 /// trusted authorization adapter must derive that scope for each request.
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -49,7 +49,7 @@ impl ExternalIdentity {
     /// Build opaque identity evidence from an already verified issuer/subject pair.
     ///
     /// The byte limits are defensive admission bounds, not an attempt to
-    /// redefine OpenID Connect or JWT identifier syntax. Spaces and ordinary
+    /// redefine `OpenID` Connect or JWT identifier syntax. Spaces and ordinary
     /// Unicode are preserved while control characters are rejected.
     ///
     /// # Errors
@@ -85,7 +85,7 @@ impl ExternalIdentity {
 ///
 /// `collection_ref` and `event_ref` are opaque resource references. They let a
 /// policy adapter enforce resource-scoped grants without exposing calendar
-/// persistence or forcing CalendarWeave to own the external policy model.
+/// persistence or forcing `CalendarWeave` to own the external policy model.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct CalendarAuthorizationRequest<'a> {
     action: CalendarAction,
@@ -208,7 +208,8 @@ where
         identity: &ExternalIdentity,
         display_name: &str,
     ) -> Result<CalendarCollection, CalendarError> {
-        let tenant_id = self.authorize(identity, &CalendarAuthorizationRequest::create_collection())?;
+        let tenant_id =
+            self.authorize(identity, &CalendarAuthorizationRequest::create_collection())?;
         self.calendar.create_collection(&tenant_id, display_name)
     }
 
@@ -254,13 +255,8 @@ where
             identity,
             &CalendarAuthorizationRequest::update_event(collection_ref, event_ref),
         )?;
-        self.calendar.update_event(
-            &tenant_id,
-            collection_ref,
-            event_ref,
-            if_match,
-            icalendar,
-        )
+        self.calendar
+            .update_event(&tenant_id, collection_ref, event_ref, if_match, icalendar)
     }
 
     /// List events after collection-scoped read authorization succeeds.
