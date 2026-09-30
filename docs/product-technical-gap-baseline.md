@@ -45,7 +45,7 @@ Persistence remains 3NF with descriptive multiword `snake_case` objects: `calend
 | Lane | Exact evidence observed in this iteration | Status / next verification |
 | --- | --- | --- |
 | protected `main` | `d972ccae6225716bdff7210a1fed808c01d32689` | Seed only; protected by active organization required-workflow/review ruleset |
-| PR #1 `docs/adr-baseline` | PRs #3/#4/#5 merged into this branch | Executable core, PostgreSQL and bounded `TZID` are integrated but not on protected `main`; required checks and review govern its merge |
+| PR #1 `docs/adr-baseline` | PRs #3/#4/#5 merged into this branch; current candidate covers revision exhaustion and malformed named-timezone end values | Executable core, PostgreSQL and bounded `TZID` are integrated but not on protected `main`; replacement exact-head required checks and review govern its merge |
 | PRs #3/#4/#5 | Closed and merged into PR #1 branch | Their successful exact-head Rust and coverage checks supported branch integration; PR #1 needs its own checks before protected-main merge |
 | PR #6 `feat/authorization-admission-v1` | Open candidate based on PR #1 | Current-head hosted checks and semantic review remain required; the open review thread requests hosted check evidence |
 | PR #7 `feat/postgres-recovery-v1` | Open candidate stacked after #6 | The RED recovery contract preceded production scripts; current-head rust, coverage and recovery checks remain required |
@@ -90,6 +90,10 @@ Issue #2 remains the canonical commercialization tracker and must stay open. It 
 - Relational persistence stays normalized and item-level UPSERT/idempotency semantics remain explicit. Event writes lock only the item that needs serialization.
 - Logical backup digest verification is integrity evidence, not encryption, signature, provenance, PITR, HA, or RPO/RTO evidence.
 - Web p95/load targets do not apply until a web/service surface exists; once one does, asynchronous handling and realistic k6 evidence become release gates.
+- The revision counter must fail closed at `u64::MAX` without replacing the current event; named-timezone parsing must reject malformed local end values before interval comparison.
+- Exact-head checks, live reviews/threads, rulesets and concurrent writer state are re-read after every branch move; stale/queued/cancelled evidence is non-passing.
+- Logical restore must remain fail-closed on missing/malformed/tampered evidence and prove post-restore relational invariants. A successful logical drill alone cannot satisfy production recovery/PITR/RPO/RTO gates.
+- Release additionally requires security/SBOM/provenance, compose-compatible operability, rollback/recovery, real service authentication, realistic protocol/consumer evidence and PII/audit controls.
 
 ## Required development order
 

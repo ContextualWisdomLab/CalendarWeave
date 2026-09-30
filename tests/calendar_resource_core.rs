@@ -232,6 +232,7 @@ fn named_timezone_intervals_resolve_unambiguous_iana_instants() {
         TZID_EVENT.replace("DTEND;TZID=Asia/Seoul", "DTEND"),
         TZID_EVENT.replace("DTEND;TZID=Asia/Seoul", "DTEND;TZID=America/New_York"),
         TZID_EVENT.replace("DTEND;TZID=Asia/Seoul", "DTEND;TZID=Asia/Seoul;X-TEST=1"),
+        TZID_EVENT.replace("20260902T100000", "not-a-local-time"),
         TZID_EVENT.replace("20260902T100000", "20260902T080000"),
         TZID_EVENT
             .replace("Asia/Seoul", "America/New_York")
