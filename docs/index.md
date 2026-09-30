@@ -4,7 +4,7 @@ CalendarWeave is ContextualWisdomLab's governed calendar-resource product for in
 
 ## What is being built
 
-The first release target is a small, independently testable calendar core that can create and retrieve tenant-scoped RFC 5545 events, preserve stable resource identity and revision evidence, enforce timezone and interval semantics, and persist resources without exposing application database internals to consumers.
+The first release target is a small, independently testable calendar core that can create and retrieve tenant-scoped RFC 5545 events, preserve stable resource identity and revision evidence, enforce timezone and explicit interval semantics, and persist resources without exposing application database internals to consumers. The current candidate stack accepts bounded `DTEND` intervals and positive RFC 5545 `DURATION` intervals while broader recurrence, `VTIMEZONE`, CalDAV, provider, service-authentication, and release capabilities remain gated.
 
 ## Current status
 
@@ -15,6 +15,8 @@ The project is in active foundation development. A public production endpoint, p
 - [Repository overview](../README.md)
 - [Architecture](../ARCHITECTURE.md)
 - [Architecture decisions](adr/)
+- [RFC 5545 DURATION traceability](doctoring/rfc5545-duration-baseline.md)
+- [Product and technical gap baseline](product-technical-gap-baseline.md)
 - [DeepWiki](https://deepwiki.com/ContextualWisdomLab/CalendarWeave)
 
 ## Integration boundary

@@ -16,10 +16,15 @@ and resource references to an external authorization port, and uses only the
 authorization-derived tenant when delegating to the core. Authorization precedes
 calendar parsing. The stacked ADR-0006 candidate adds a PostgreSQL logical
 backup/restore operation with private artifacts, checksum-before-restore and an
-executable invariant recovery drill. These remain candidate evidence rather than
-protected-main or released-product evidence; ADR-0006 specifically does not
-claim an operated RPO/RTO, WAL/PITR, HA/failover, service authentication,
-CalDAV deployment, or consumer migration.
+executable invariant recovery drill. ADR-0007 adds the next bounded RFC 5545
+interoperability slice: positive `DURATION` values become an alternative to
+`DTEND` while remaining mutually exclusive, DATE starts accept only day/week
+durations, and the same UTC/IANA start validator is reused by both persistence
+adapters. These remain candidate evidence rather than protected-main or
+released-product evidence; ADR-0006 specifically does not claim an operated
+RPO/RTO, WAL/PITR, HA/failover, service authentication, CalDAV deployment, or
+consumer migration, and ADR-0007 does not claim `VTIMEZONE`, recurrence,
+floating-time, free/busy expansion, or full RFC 5545 conformance.
 
 ## Product responsibility
 
@@ -88,7 +93,7 @@ CalendarWeave does not interpret or calculate Four Pillars. `four-pillars` remai
 | Calendar collection/event resource and revision | CalendarWeave | Naruon, LineageWeave, saju-caldav, external clients |
 | Calendar operation admission | CalendarWeave | Tenant-free external identity + resource-aware typed request; authorization authority derives tenant; no token verifier or local policy store |
 | Identity, federation and external authorization policy | Keyverse | CalendarWeave consumes verified issuer/subject identity and resource-aware policy decisions through an ACL |
-| iCalendar / CalDAV protocol semantics | CalendarWeave | Consumer products use ports/adapters |
+| iCalendar / CalDAV protocol semantics | CalendarWeave | Consumer products use ports/adapters; candidate supports explicit `DTEND` and positive RFC 5545 `DURATION` interval forms |
 | Provider calendar sync and revision receipts | CalendarWeave | Consumer-specific authorization intent remains with consumer |
 | PostgreSQL logical recovery operation | CalendarWeave | ADR-0006 / PR #7 candidate proves digest-verified logical restore; deployment owns backup store, keys, cadence, RPO/RTO and WAL/PITR/HA |
 | Workspace commitment/conflict decision | Naruon | References CalendarWeave event/resource evidence |
@@ -101,6 +106,7 @@ CalendarWeave does not interpret or calculate Four Pillars. `four-pillars` remai
 
 - `CalendarCollection` is the collection identity boundary and owns membership of event resources in one tenant scope.
 - `CalendarEvent` represents the current read projection of an immutable-UID event resource; revision transitions remain conditional on the current strong ETag.
+- A CalendarWeave v1 VEVENT carries exactly one explicit interval form: `DTEND` or positive RFC 5545 `DURATION`. DATE-valued starts permit only day/week durations. Duration remains part of the validated source payload rather than a second persisted aggregate or guessed fixed-second end timestamp.
 - `TenantId` and `ExternalIdentity` are value objects. `ExternalIdentity` has no tenant authority and never becomes a persisted calendar aggregate merely because admission used it.
 - `CalendarAuthorizationRequest` is a request value carrying only action and opaque target references required by authorization; it is not persisted as a calendar aggregate.
 - `AuthorizedCalendarService` is an application/domain-facing service, not an aggregate. It obtains authorization before domain processing and delegates one item-level operation at a time using only the returned tenant.
@@ -140,7 +146,7 @@ Fail closed without purpose-limited identity and authorization. Consume Keyverse
 
 Calendar backup artifacts can contain the same necessary calendar PII. ADR-0006 therefore protects logical backup artifacts with owner-only file permissions and verifies their digest before restore; it does not mask data in a way that would make recovery unusable. Production storage encryption, access policy, retention, key management and remote durability remain explicit deployment gates.
 
-The current ADR-0005 candidate proves only an in-process admission contract. HTTP/service authentication, token verification, durable authorization/audit evidence, rate limiting, production Keyverse integration, CSAP/SOC 2 operational evidence, and released interoperability remain open. ADR-0006 similarly proves only a bounded logical recovery operation, not PITR, HA or an operated disaster-recovery objective.
+The current ADR-0005 candidate proves only an in-process admission contract. HTTP/service authentication, token verification, durable authorization/audit evidence, rate limiting, production Keyverse integration, CSAP/SOC 2 operational evidence, and released interoperability remain open. ADR-0006 similarly proves only a bounded logical recovery operation, not PITR, HA or an operated disaster-recovery objective. ADR-0007 validates and preserves duration semantics only; it does not compute free/busy or recurrence end instants and therefore does not create a DST or scheduling-policy claim beyond the RFC-backed input profile.
 
 ## Citations
 

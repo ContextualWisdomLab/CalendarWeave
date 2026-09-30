@@ -9,11 +9,12 @@ CalendarWeave owns the reusable **generic calendar-resource** bounded context. I
 - **LineageWeave:** read-only calendar/evidence composition and deep links. Never own a calendar store or provider credentials.
 - **saju-caldav:** saju-specific profile/candidate/scoring/explanation and publication intent. Its current Radicale stack is a compatibility path until CalendarWeave proves production parity; generic CalDAV ownership then migrates here.
 - **four-pillars:** deterministic Four Pillars calculation/reporting. Never move that computation into CalendarWeave.
-- **Keyverse:** identity/federation. CalendarWeave validates scoped identity and does not implement a local IdP.
+- **Keyverse:** identity/federation and external authorization policy. CalendarWeave accepts tenant-free verified issuer/subject evidence, derives tenant scope only from the trusted resource-aware authorization decision, and does not implement a local IdP.
 
 ## Do
 
 - Implement RFC 5545 VEVENT and RFC 4791 CalDAV collection semantics test-first.
+- Treat `DTEND` and positive RFC 5545 `DURATION` as the bounded v1 interval alternatives under ADR-0007; keep unsupported recurrence, floating time, `VTIMEZONE`, and unhandled parameters fail-closed until explicitly versioned.
 - Add RFC 5546 iTIP, RFC 6578 sync and RFC 6638 scheduling only as explicit versioned capabilities with discovery/fail-closed behavior.
 - Keep standalone service and module/package consumption paths both possible through published contracts.
 - Organize source by real bounded-context responsibility; provider SDKs belong behind adapters/Anti-Corruption Layers, never inside domain entities.
