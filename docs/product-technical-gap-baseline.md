@@ -26,7 +26,7 @@ Core subdomain: governed calendar-resource semantics and mutation/revision invar
 
 | Lane | Exact evidence at this update | Status / next verification |
 | --- | --- | --- |
-| PR #1 `docs/adr-baseline` | PRs #3/#4/#5 merged into this branch | Executable core, PostgreSQL and bounded `TZID` are integrated but not on protected `main`; exact-head required checks and review govern its merge |
+| PR #1 `docs/adr-baseline` | PRs #3/#4/#5 merged into this branch; current candidate covers revision exhaustion and malformed named-timezone end values | Executable core, PostgreSQL and bounded `TZID` are integrated but not on protected `main`; replacement exact-head required checks and review govern its merge |
 | PRs #3/#4/#5 | Closed and merged into PR #1 branch | Their successful exact-head Rust and coverage checks supported branch integration; PR #1 needs its own checks before protected-main merge |
 | PRs #6/#7/#8/#9 | Open candidate stack, with #6 based on PR #1 | Authorization admission, recovery, `DURATION` and `CLASS` are not yet integrated into PR #1; new-head hosted checks are pending |
 | Central runner cause | ContextualWisdomLab/.github #1618 merged | Organization evidence proved floating `ubuntu-latest` jobs could remain `runner_id=0` while explicit Ubuntu 24.04 executed; CalendarWeave now has a permanent local selector regression |
@@ -57,6 +57,7 @@ The observed pre-fix CalendarWeave job state was queued with `runner_id=0`, empt
 ## Quality and release gates
 
 - Behavior changes start with RED executable contracts; the runner-selector incident has a permanent regression test.
+- The revision counter must fail closed at `u64::MAX` without replacing the current event; named-timezone parsing must reject malformed local end values before interval comparison.
 - Touched production code targets 100% owned statement and branch coverage plus complete rustdoc/docstring coverage.
 - No deprecation-warning suppression or governance-gate weakening.
 - Exact-head checks, live reviews/threads, rulesets and concurrent writer state are re-read after every branch move; stale evidence is non-passing.
