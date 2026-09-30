@@ -541,3 +541,52 @@ fn named_datetime(timezone: Tz, value: &str) -> Result<chrono::DateTime<Tz>, Cal
         .single()
         .ok_or(CalendarError::MalformedCalendar)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const EVENT: &str = "BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//ContextualWisdomLab//CalendarWeave Test//EN\r\nBEGIN:VEVENT\r\nUID:revision-limit@example.test\r\nDTSTAMP:20260901T000000Z\r\nDTSTART:20260902T090000Z\r\nDTEND:20260902T100000Z\r\nSUMMARY:Revision limit\r\nEND:VEVENT\r\nEND:VCALENDAR\r\n";
+    const UPDATED_EVENT: &str = "BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//ContextualWisdomLab//CalendarWeave Test//EN\r\nBEGIN:VEVENT\r\nUID:revision-limit@example.test\r\nDTSTAMP:20260901T000000Z\r\nDTSTART:20260902T090000Z\r\nDTEND:20260902T100000Z\r\nSUMMARY:Revision limit update\r\nEND:VEVENT\r\nEND:VCALENDAR\r\n";
+
+    #[test]
+    fn revision_overflow_fails_closed_without_replacing_the_event() {
+        let tenant = TenantId::parse("revision-limit-tenant").expect("test tenant is valid");
+        let mut service = InMemoryCalendarService::new();
+        let collection = service
+            .create_collection(&tenant, "Revision limit calendar")
+            .expect("test collection is valid");
+        let created = service
+            .create_event(&tenant, &collection.collection_ref, EVENT)
+            .expect("test event is valid");
+        let saturated_etag = format!("\"{}:{}\"", created.event_ref, u64::MAX);
+
+        let stored = service
+            .collections
+            .get_mut(&collection.collection_ref)
+            .expect("test collection exists")
+            .events
+            .get_mut(&created.event_ref)
+            .expect("test event exists");
+        stored.revision = u64::MAX;
+        stored.etag.clone_from(&saturated_etag);
+
+        assert_eq!(
+            service.update_event(
+                &tenant,
+                &collection.collection_ref,
+                &created.event_ref,
+                &saturated_etag,
+                UPDATED_EVENT,
+            ),
+            Err(CalendarError::StaleRevision)
+        );
+        assert_eq!(
+            service
+                .get_event(&tenant, &collection.collection_ref, &created.event_ref)
+                .expect("saturated event remains readable")
+                .icalendar,
+            EVENT
+        );
+    }
+}

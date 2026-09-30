@@ -27,7 +27,7 @@ Core subdomain: governed calendar-resource semantics and mutation/revision invar
 
 | Lane | Exact evidence at this update | Status / next verification |
 | --- | --- | --- |
-| PR #1 `docs/adr-baseline` | PRs #3/#4/#5 merged into this branch | Executable core, PostgreSQL and bounded `TZID` are integrated but not on protected `main`; exact-head required checks and review govern its merge |
+| PR #1 `docs/adr-baseline` | PRs #3/#4/#5 merged into this branch; current candidate covers revision exhaustion and malformed named-timezone end values | Executable core, PostgreSQL and bounded `TZID` are integrated but not on protected `main`; replacement exact-head required checks and review govern its merge |
 | PRs #3/#4/#5 | Closed and merged into PR #1 branch | Their successful exact-head Rust and coverage checks supported branch integration; PR #1 needs its own checks before protected-main merge |
 | PR #6 `feat/authorization-admission-v1` | Open candidate based on PR #1 | Tenant-free verified identity evidence and resource-aware authorization are not yet integrated into PR #1; exact-head hosted checks and semantic review remain required |
 | PRs #7/#8/#9 | Open candidate stack after #6 | Logical recovery, `DURATION` and `CLASS` are not yet integrated into PR #1; new-head hosted checks remain required |
@@ -63,7 +63,8 @@ The observed pre-fix CalendarWeave job state was queued with `runner_id=0`, empt
 
 ## Quality, operability and release gates
 
-- Behavior changes start with RED executable contracts; PR #6 preserves a test-only first commit before production admission code and subsequent security regressions cover tenant/resource authorization scope.
+- Behavior changes start with RED executable contracts; PR #6 preserves a test-only first commit before production admission code, subsequent security regressions cover tenant/resource authorization scope, and the runner-selector incident has a permanent regression test.
+- The revision counter must fail closed at `u64::MAX` without replacing the current event; named-timezone parsing must reject malformed local end values before interval comparison.
 - Touched production code targets 100% owned statement/branch coverage plus complete rustdoc/docstring coverage; exact-head hosted checks are authoritative.
 - No deprecation-warning suppression, self-approval, force-push, destructive rebase or governance-gate weakening.
 - Exact-head checks, live reviews/threads, rulesets and concurrent writer state are re-read after every branch move; stale/queued/cancelled evidence is non-passing.

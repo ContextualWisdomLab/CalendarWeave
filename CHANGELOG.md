@@ -13,7 +13,8 @@
 - Add a fail-closed external authorization admission candidate in which `ExternalIdentity` carries only verified issuer/subject evidence, `CalendarAuthorizationRequest` carries exact resource context, and the trusted authorization decision derives the tenant used by the Calendar Resource Core; callers cannot self-assert tenant scope through the admission API.
 - Record RFC 7519/OpenID Connect identity traceability so issuer plus subject jointly identify an external principal and defensive API bounds do not become an invented subject-character grammar.
 - Enforce resource-scoped authorization inputs so collection/event grants do not collapse into tenant-wide permission, while deny/unavailable states still authorize-before-parse and fail closed.
-- Fail closed for malformed, cross-tenant, stale-revision, unsupported, denied, and authorization-unavailable calendar requests with exact-head coverage gates.
+- Fail closed for malformed, cross-tenant, stale-revision, unsupported, denied, and authorization-unavailable calendar requests with 100% owned line and branch coverage.
+- Prove that an exhausted `u64` event revision fails closed without replacing the stored event, and reject malformed named-timezone end values through the public parser contract.
 - Replace repository-local `ubuntu-latest` selectors with explicit `ubuntu-24.04`, preserving PostgreSQL service coverage, after the same hosted-runner starvation signature proven by central `.github` #1618; add a permanent two-job selector regression.
 - Refresh the product/technical gap baseline from live architecture, implementation, persistence, time-semantics, authorization, review-control and operability evidence without promoting candidate branches to shipped evidence.
 - Next: establish concrete service/Keyverse authentication, operated backup/recovery, standards-backed `DURATION`/`VTIMEZONE` capability slices, versioned release evidence, and consumer migration gates.
