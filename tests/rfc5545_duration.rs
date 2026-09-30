@@ -23,10 +23,14 @@ fn create_event(input: &str) -> Result<CalendarEvent, CalendarError> {
 fn positive_duration_is_an_interval_alternative_to_dtend() {
     for input in [
         payload("DTSTART:20260902T090000Z", "DURATION:PT30M"),
+        payload("DTSTART:20260902T090000Z", "DURATION:PT1H30M"),
         payload("DTSTART:20260902T090000Z", "DURATION:PT1H30S"),
+        payload("DTSTART:20260902T090000Z", "DURATION:PT30M5S"),
         payload("DTSTART:20260902T090000Z", "DURATION:+PT1H0M0S"),
         payload("DTSTART:20260902T090000Z", "DURATION:P15DT5H0M20S"),
         payload("DTSTART:20260902T090000Z", "DURATION:P1DT1H30S"),
+        payload("DTSTART:20260902T090000Z", "DURATION:P0DT1H"),
+        payload("DTSTART:20260902T090000Z", "DURATION:P1DT0S"),
         payload("DTSTART;TZID=Asia/Seoul:20260902T090000", "DURATION:P1DT2H"),
         payload("DTSTART;VALUE=DATE:20260902", "DURATION:P1D"),
         payload("DTSTART;VALUE=DATE:20260902", "DURATION:P2W"),
@@ -65,11 +69,16 @@ fn duration_must_be_positive_and_match_the_rfc5545_duration_grammar() {
         "P",
         "PT",
         "P1W1D",
+        "P0DT0S",
+        "PDT1H",
+        "PXDT1H",
         "P1Y",
         "P1M",
         "PT1.5H",
         "PT1H30S5M",
+        "PT1H30M5X",
         "PT1M2H",
+        "P1DT",
     ] {
         let input = payload("DTSTART:20260902T090000Z", &format!("DURATION:{value}"));
         assert_eq!(
@@ -90,6 +99,15 @@ fn date_start_accepts_only_day_or_week_duration_shapes() {
             "DATE DTSTART requires dur-day or dur-week: {value}"
         );
     }
+    for malformed_start in [
+        "DTSTART;VALUE=DATE;X-SYNTHETIC=1:20260902",
+        "DTSTART;VALUE=DATE:not-a-date",
+    ] {
+        assert_eq!(
+            create_event(&payload(malformed_start, "DURATION:P1D")),
+            Err(CalendarError::MalformedCalendar)
+        );
+    }
 }
 
 #[test]
@@ -106,6 +124,20 @@ fn duration_reuses_named_timezone_start_fail_closed_semantics() {
     assert_eq!(
         create_event(&payload(
             "DTSTART;TZID=Synthetic/Unknown:20260902T090000",
+            "DURATION:PT1H"
+        )),
+        Err(CalendarError::UnsupportedCapability)
+    );
+    assert_eq!(
+        create_event(&payload(
+            "DTSTART;TZID=Asia/Seoul;X-SYNTHETIC=1:20260902T090000",
+            "DURATION:PT1H"
+        )),
+        Err(CalendarError::MalformedCalendar)
+    );
+    assert_eq!(
+        create_event(&payload(
+            "DTSTART;X-SYNTHETIC=1:20260902T090000Z",
             "DURATION:PT1H"
         )),
         Err(CalendarError::UnsupportedCapability)

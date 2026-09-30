@@ -51,7 +51,7 @@ Persistence remains 3NF with descriptive multiword `snake_case` objects: `calend
 | PRs #3/#4/#5 | Closed and merged into PR #1 branch | Their successful exact-head Rust and coverage checks supported branch integration; PR #1 needs its own checks before protected-main merge |
 | #6 `feat/authorization-admission-v1` | Open candidate based on PR #1 | Current-head hosted checks and semantic review remain required; the open review thread requests hosted check evidence |
 | #7 `feat/postgres-recovery-v1` | Open candidate stacked after #6 | RED recovery contract preceded production scripts; current-head rust, coverage and recovery checks remain required |
-| #8 `feat/rfc5545-duration-v1` | Open candidate stacked after #7 | Test-first `DURATION` lane; current-head rust, coverage and recovery checks remain required |
+| #8 `feat/rfc5545-duration-v1` | Open candidate stacked after #7 | Test-first `DURATION` lane with one mutual-exclusion validator and explicit grammar/parameter edge fixtures; replacement exact-head rust, coverage and recovery checks remain required |
 | #9 `feat/rfc5545-class-v1` | Open candidate stacked after #8 | RED-first `CLASS` implementation and forged-projection hardening; current-head checks and review remain required |
 | central runner acquisition | ContextualWisdomLab/.github #712 | current central evidence identifies avoidable COMMENTED-review scheduler wakeups as one causal queue-amplification defect; do not churn leaf heads or declare queued jobs passing |
 

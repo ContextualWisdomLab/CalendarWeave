@@ -455,9 +455,6 @@ fn validate_singleton_properties(input: &str) -> Result<(), CalendarError> {
             return Err(CalendarError::MalformedCalendar);
         }
     }
-    if property_count(input, "DTEND") + property_count(input, "DURATION") != 1 {
-        return Err(CalendarError::MalformedCalendar);
-    }
     Ok(())
 }
 
@@ -665,7 +662,10 @@ fn positive_duration(value: &str, date_only: bool) -> bool {
     let Some((days, time)) = body.split_once("DT") else {
         return false;
     };
-    let day_nonzero = digits(days).is_some_and(|digits| digits.bytes().any(|digit| digit != b'0'));
+    let Some(days) = digits(days) else {
+        return false;
+    };
+    let day_nonzero = days.bytes().any(|digit| digit != b'0');
     let Some(time_nonzero) = duration_time_nonzero(time) else {
         return false;
     };
