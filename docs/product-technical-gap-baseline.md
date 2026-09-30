@@ -47,7 +47,7 @@ Persistence remains 3NF with descriptive multiword `snake_case` objects: `calend
 | Lane | Exact head / evidence | Current status / next verification |
 | --- | --- | --- |
 | protected `main` | `d972ccae6225716bdff7210a1fed808c01d32689` | seed only; no released product surface |
-| #1 `docs/adr-baseline` | PRs #3/#4/#5 merged into this branch | Executable core, PostgreSQL and bounded `TZID` are integrated but not on protected `main`; required checks and review govern its merge |
+| #1 `docs/adr-baseline` | PRs #3/#4/#5 merged into this branch; current candidate covers revision exhaustion and malformed named-timezone end values | Executable core, PostgreSQL and bounded `TZID` are integrated but not on protected `main`; replacement exact-head required checks and review govern its merge |
 | PRs #3/#4/#5 | Closed and merged into PR #1 branch | Their successful exact-head Rust and coverage checks supported branch integration; PR #1 needs its own checks before protected-main merge |
 | #6 `feat/authorization-admission-v1` | Open candidate based on PR #1 | Current-head hosted checks and semantic review remain required; the open review thread requests hosted check evidence |
 | #7 `feat/postgres-recovery-v1` | Open candidate stacked after #6 | RED recovery contract preceded production scripts; current-head rust, coverage and recovery checks remain required |
@@ -92,10 +92,15 @@ Issue #2 remains the canonical commercialization tracker and stays open. #9 addr
 - CalendarWeave and LineageWeave contain no mathematical/psychometric computation that belongs in dedicated mathematical owners.
 - Authorization precedes untrusted calendar parsing/mutation. Cross-tenant and absent-resource observations remain indistinguishable at the core boundary.
 - RFC 5545 `CLASS` is not access-control authority; valid unknown tokens fail-private to avoid accidental widening, and public classification projections must pass the full supported-event validator before being trusted.
+- No raw bearer token/provider credential becomes a Calendar Resource attribute or ordinary telemetry field.
 - Necessary calendar PII is protected through least privilege, purpose/tenant isolation, encryption, retention, export/access audit and test anonymization rather than blanket masking that breaks calendar work.
 - Relational persistence stays normalized; item-level idempotency/UPSERT semantics remain explicit; writes lock only the required item.
 - Logical-backup digest verification is integrity evidence, not encryption, provenance, PITR, HA or RPO/RTO evidence.
 - Web p95/k6 gates become applicable only when a web/service surface exists; no absent web surface is represented as load-tested.
+- The revision counter must fail closed at `u64::MAX` without replacing the current event; named-timezone parsing must reject malformed local end values before interval comparison.
+- Exact-head checks, live reviews/threads, rulesets and concurrent writer state are re-read after every branch move; stale/queued/cancelled evidence is non-passing.
+- Logical restore must remain fail-closed on missing/malformed/tampered evidence and prove post-restore relational invariants. A successful logical drill alone cannot satisfy production recovery/PITR/RPO/RTO gates.
+- Release additionally requires security/SBOM/provenance, compose-compatible operability, rollback/recovery, real service authentication, realistic protocol/consumer evidence and PII/audit controls.
 
 ## Required development order
 
