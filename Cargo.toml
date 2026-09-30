@@ -1,0 +1,22 @@
+[package]
+name = "calendarweave"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.97.1"
+license = "Apache-2.0"
+description = "Tenant-scoped generic calendar resource core"
+
+[dependencies]
+chrono = "0.4.42"
+chrono-tz = "0.10.4"
+icalendar = "0.17.13"
+postgres = "0.19.14"
+uuid = { version = "1.26.0", features = ["v4"] }
+
+[lints.rust]
+missing_docs = "deny"
+unsafe_code = "forbid"
+
+[lints.clippy]
+all = "deny"
+pedantic = "deny"
