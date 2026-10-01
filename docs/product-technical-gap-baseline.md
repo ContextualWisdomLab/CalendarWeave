@@ -28,7 +28,7 @@ Transactions remain item-scoped: create is idempotent by collection + RFC UID; c
 
 ## Current feature specification
 
-The candidate Calendar Resource Core supports tenant-scoped collection create and VEVENT create/update/list/get. Supported VEVENTs require RFC 5545 `VERSION:2.0`, `PRODID`, UID, UTC `DTSTAMP`, start, summary, and exactly one explicit interval form. Standard confirmed/tentative/cancelled status and non-negative `SEQUENCE` are bounded optional fields.
+The candidate Calendar Resource Core supports tenant-scoped collection create and VEVENT create/update/list/get. Supported VEVENTs require RFC 5545 `VERSION:2.0`, `PRODID`, UID, UTC `DTSTAMP`, start, summary, and exactly one explicit interval form. Case-insensitive standard confirmed/tentative/cancelled status and non-negative `SEQUENCE` are bounded optional fields.
 
 Time and privacy behavior is explicit:
 
@@ -52,7 +52,7 @@ Persistence remains 3NF with descriptive multiword `snake_case` objects: `calend
 | #6 `feat/authorization-admission-v1` | `3b2b3a532df4663dd8d2af9e4b6cca444fdfee93`; Tests `36686514860` succeeded and its hosted-evidence thread is resolved | Independent approval is absent; the central Security/SAST/CodeQL suite did not materialize on the stacked base |
 | #7 `feat/postgres-recovery-v1` | `f31728a5a9009e65bc560dabdf450fa940bd809a`; Tests `36686710710` succeeded | RED recovery contract preceded production scripts; independent approval and stacked-base central scans remain required |
 | #8 `feat/rfc5545-duration-v1` | `88844ad55c94cf3ed4f362bf4bea5ef579a20513`; Tests `36688373491` succeeded | Test-first `DURATION` lane and exact-head repository checks are GREEN; independent approval and stacked-base central scans remain required |
-| #9 `feat/rfc5545-class-v1` | `6a990dea1d1ab7bfd3639c308d1dc4f00d261e75`; Tests `36688791851` succeeded; fresh layer-diff and caller-path review found no new source defect | RED-first `CLASS` implementation and forged-projection hardening remain Draft; independent approval and stacked-base central scans remain required |
+| #9 `feat/rfc5545-class-v1` | `d34cf18fb8037be144c44012c51c1d3f41065651` added the `STATUS` interoperability regression; Tests `36892549369` failed exactly on that contract; `4e26597bb52650dd64a5d40ca92376194bfb0b1f` contains the bounded repair | Exact-head checks for the successor are pending; independent approval and stacked-base central scans remain required |
 | central security foundation | ContextualWisdomLab/.github #810 and #2073 | #810 owns fail-closed Dependency Review availability; #2073 owns missing exact-head central scans for feature-base stacked PRs. Leaf branches must not copy workflows, inherit predecessor receipts or weaken gates |
 
 The live governance path requires exact-current-head checks/reviews. PRs #3/#4/#5 were marked Ready through the CLI and merged into PR #1 without self-approval, admin bypass or protection weakening.
@@ -62,6 +62,8 @@ The live governance path requires exact-current-head checks/reviews. PRs #3/#4/#
 The initial RED commit `b91602811a231c726ab5fbc5a2e0a1af894e9346` added `tests/rfc5545_classification.rs` before production CLASS support. A standards audit then corrected overly narrow assumptions before final production behavior: `18d3ea264d2f0c3bfeea10e5af6fa01ff4bbe706` requires case-insensitive standard values, extension-parameter interoperability, and fail-private handling for valid unknown registered/experimental values. `707fcecdb45a273028b2d7966888c3a507d268d5` implements that corrected Rust contract.
 
 A subsequent exact-head static review found that the public classification accessor re-parsed only singleton/component/classification structure rather than the entire supported event profile. That meant a manually forged public `CalendarEvent` could retain a valid `CLASS` while gaining an unsupported property and still return a classification. `bfe078a556677ec99d76c87533bcbd5967836da6` added the RED regression first; `b12f95dee6b3a73f87a56316a48830f45ae3612b` then made the accessor reuse `parse_event` and moved the parsed classification into `ParsedEvent`, so classification now inherits the same fail-closed full-profile validation as event admission.
+
+The same standards review exposed an older interoperability defect outside the new `CLASS` projection: `STATUS` matched only uppercase spellings even though RFC 5545 enumerated values are case-insensitive. `d34cf18fb8037be144c44012c51c1d3f41065651` added the focused RED contract; hosted Tests `36892549369` failed in both `rust` and `coverage` with `MalformedCalendar` while recovery remained green. `4e26597bb52650dd64a5d40ca92376194bfb0b1f` changes only the three standard `STATUS` comparisons to ASCII case-insensitive matching and preserves duplicate, parameterized and unknown-value rejection.
 
 ADR-0008 and `docs/doctoring/rfc5545-class-privacy-baseline.md` bind the candidate to RFC 5545 sections 3.1 and 3.8.1.3. RFC 5545 defines omitted CLASS as PUBLIC, permits IANA/non-standard parameters, requires unrecognized iana-token/x-name values to be treated like PRIVATE, and explicitly warns that CLASS is owner intent rather than an enforcement statement. The same RFC states enumerated values are case-insensitive. These semantics are represented directly rather than replaced with a local heuristic.
 
