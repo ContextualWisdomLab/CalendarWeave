@@ -47,13 +47,13 @@ Persistence remains 3NF with descriptive multiword `snake_case` objects: `calend
 | Lane | Exact head / evidence | Current status / next verification |
 | --- | --- | --- |
 | protected `main` | `d972ccae6225716bdff7210a1fed808c01d32689` | seed only; no released product surface |
-| #1 `docs/adr-baseline` | PRs #3/#4/#5 merged into this branch; current candidate covers revision exhaustion and malformed named-timezone end values | Executable core, PostgreSQL and bounded `TZID` are integrated but not on protected `main`; replacement exact-head required checks and review govern its merge |
+| #1 `docs/adr-baseline` | `5c85765adb3e3d9514e387921103d2fda7944c18`; Tests `36686207005` and SAST `36686206972` succeeded; Security Scan `36686206813` failed closed on Dependency Review HTTP 403; CodeQL `36686206923` skipped | Executable core, PostgreSQL and bounded `TZID` are integrated but not on protected `main`; `.github#810` owns the dependency-review availability blocker and independent approval is still absent |
 | PRs #3/#4/#5 | Closed and merged into PR #1 branch | Their successful exact-head Rust and coverage checks supported branch integration; PR #1 needs its own checks before protected-main merge |
-| #6 `feat/authorization-admission-v1` | Open candidate based on PR #1 | Current-head hosted checks and semantic review remain required; the open review thread requests hosted check evidence |
-| #7 `feat/postgres-recovery-v1` | Open candidate stacked after #6 | RED recovery contract preceded production scripts; current-head rust, coverage and recovery checks remain required |
-| #8 `feat/rfc5545-duration-v1` | Open candidate stacked after #7 | Test-first `DURATION` lane with one mutual-exclusion validator and explicit grammar/parameter edge fixtures; replacement exact-head rust, coverage and recovery checks remain required |
-| #9 `feat/rfc5545-class-v1` | Open candidate stacked after #8 | RED-first `CLASS` implementation and forged-projection hardening; current-head checks and review remain required |
-| central runner acquisition | ContextualWisdomLab/.github #712 | current central evidence identifies avoidable COMMENTED-review scheduler wakeups as one causal queue-amplification defect; do not churn leaf heads or declare queued jobs passing |
+| #6 `feat/authorization-admission-v1` | `3b2b3a532df4663dd8d2af9e4b6cca444fdfee93`; Tests `36686514860` succeeded and its hosted-evidence thread is resolved | Independent approval is absent; the central Security/SAST/CodeQL suite did not materialize on the stacked base |
+| #7 `feat/postgres-recovery-v1` | `f31728a5a9009e65bc560dabdf450fa940bd809a`; Tests `36686710710` succeeded | RED recovery contract preceded production scripts; independent approval and stacked-base central scans remain required |
+| #8 `feat/rfc5545-duration-v1` | `88844ad55c94cf3ed4f362bf4bea5ef579a20513`; Tests `36688373491` succeeded | Test-first `DURATION` lane and exact-head repository checks are GREEN; independent approval and stacked-base central scans remain required |
+| #9 `feat/rfc5545-class-v1` | `6a990dea1d1ab7bfd3639c308d1dc4f00d261e75`; Tests `36688791851` succeeded; fresh layer-diff and caller-path review found no new source defect | RED-first `CLASS` implementation and forged-projection hardening remain Draft; independent approval and stacked-base central scans remain required |
+| central security foundation | ContextualWisdomLab/.github #810 and #2073 | #810 owns fail-closed Dependency Review availability; #2073 owns missing exact-head central scans for feature-base stacked PRs. Leaf branches must not copy workflows, inherit predecessor receipts or weaken gates |
 
 The live governance path requires exact-current-head checks/reviews. PRs #3/#4/#5 were marked Ready through the CLI and merged into PR #1 without self-approval, admin bypass or protection weakening.
 
