@@ -473,9 +473,9 @@ fn parse_status(property: Option<&Property>) -> Result<EventStatus, CalendarErro
         return Err(CalendarError::MalformedCalendar);
     }
     match property.value() {
-        "CONFIRMED" => Ok(EventStatus::Confirmed),
-        "TENTATIVE" => Ok(EventStatus::Tentative),
-        "CANCELLED" => Ok(EventStatus::Cancelled),
+        value if value.eq_ignore_ascii_case("CONFIRMED") => Ok(EventStatus::Confirmed),
+        value if value.eq_ignore_ascii_case("TENTATIVE") => Ok(EventStatus::Tentative),
+        value if value.eq_ignore_ascii_case("CANCELLED") => Ok(EventStatus::Cancelled),
         _ => Err(CalendarError::MalformedCalendar),
     }
 }
