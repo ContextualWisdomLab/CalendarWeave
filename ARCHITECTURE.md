@@ -30,6 +30,24 @@ service authentication, CalDAV deployment, or consumer migration, while
 ADR-0007/0008 do not claim `VTIMEZONE`, recurrence, floating-time, free/busy
 expansion, CalDAV ACLs, provider sharing policy, or full RFC 5545 conformance.
 
+## Executable local operator
+
+ADR-0009 adds the `calendarweave` binary over the retained PostgreSQL application
+port. It provides explicit schema initialization plus collection/event
+create/list/get and strong-ETag update. It does not change the domain admission
+contract, implement a network listener, or treat a caller-supplied tenant as an
+authenticated identity. The trusted OS operator establishes that scope first.
+The binary rejects DNS/implicit/remote hosts and hostaddr overrides because its
+retained database adapter is non-TLS. See the local operator quickstart for a
+real build and read/write path.
+
+This is an intermediate deliverable, not a reduction of the standalone product
+objective. Keyverse RP/JWT implementations exist in the ecosystem, but the current
+software/menu PDP candidate does not return an issuer/action/calendar-resource-
+bound authorized tenant. The missing least-privilege runtime resource decision
+must be completed by its policy owner before network callers are admitted.
+Existing consumer compatibility implementations remain unchanged.
+
 ## Product responsibility
 
 CalendarWeave is the reusable calendar bounded context for ContextualWisdomLab. It owns generic calendar-resource semantics and calendar interoperability, not the business reason an event exists.

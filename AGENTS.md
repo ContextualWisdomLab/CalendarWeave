@@ -18,6 +18,8 @@ CalendarWeave owns the reusable **generic calendar-resource** bounded context. I
 - Preserve RFC 5545 `CLASS` as calendar-owner privacy intent under ADR-0008: omitted means `PUBLIC`, standard values are case-insensitive, unknown registered/experimental token values fail-private, and classification never substitutes for authorization.
 - Add RFC 5546 iTIP, RFC 6578 sync and RFC 6638 scheduling only as explicit versioned capabilities with discovery/fail-closed behavior.
 - Keep standalone service and module/package consumption paths both possible through published contracts.
+- The local operator is an intermediate trusted-OS-user path, not the final authenticated service. Restrict its retained non-TLS adapter to absolute UNIX sockets or explicit loopback IPs; schema migration is explicit `init` only.
+- Reuse the actual Keyverse RP verification contract and keep the missing runtime resource/tenant decision explicit. Never infer CalendarWeave permission from a software/menu allow or give the runtime a Keyverse operator credential.
 - Organize source by real bounded-context responsibility; provider SDKs belong behind adapters/Anti-Corruption Layers, never inside domain entities.
 - Use two-or-more-word snake_case 3NF names when relational persistence is introduced.
 - Treat PII as purpose-limited access plus audit. Do not blanket-mask attendee or organizer fields required for calendar work.

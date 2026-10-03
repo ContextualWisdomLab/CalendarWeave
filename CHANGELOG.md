@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- Add a working local PostgreSQL operator executable over the retained Calendar Port: explicit initialization, collection creation, original-byte VEVENT create/list/get, and strong-ETag update.
+- Preserve the complete CLASS/DURATION/admission/recovery stack and package preflight without rewriting predecessor branches.
+- Reject implicit, DNS, remote and hostaddr-override database targets before the non-TLS operator adapter connects; retain only explicit loopback IPs and absolute UNIX sockets.
+- Exercise the real executable in separate processes with disposable PostgreSQL, including durable readback, idempotency, stale revisions, cross-tenant denial, storage failure, credential containment and broken output.
+- Add the local operator quickstart and ADR-0009, distinguishing usable candidate artifacts from authenticated service, release, operated recovery and consumer migration.
+
 - Reframed the repository README around CalendarWeave's customer-facing calendar-resource value, current release boundary, integration responsibilities, architecture, quality posture, and next actions without advertising unreleased runtime capabilities.
 - Established the repository's original source and documentation under Apache License 2.0 after verifying the seed and architecture branch contain organization-owned documentation and no inherited third-party source license.
 - Seeded the customer-facing README and ADR baseline so CalendarWeave is a real product repository rather than an empty organization stub.

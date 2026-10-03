@@ -72,6 +72,33 @@ ADR-0008 and `docs/doctoring/rfc5545-class-privacy-baseline.md` bind the candida
 
 The classification projection is derived from the validated immutable event payload. This keeps persistence normalized and avoids introducing a synchronization invariant between a second classification column and canonical iCalendar content.
 
+## 2026-10-03 executable integration increment
+
+A dedicated integration branch preserves PR #9 at `6f5c674` and the package
+preflight at `e913958` through normal Git ancestry. It adds a trusted local
+PostgreSQL operator executable without changing the Calendar Port or external
+admission contract. The default branch and predecessor PR branches are unchanged.
+See ADR-0009 and `docs/local-operator-quickstart.md` for actual commands.
+
+Real disposable PostgreSQL and separate executable processes verify initialization,
+collection/event creation, byte-preserving readback, idempotency, conditional
+updates, tenant isolation, storage failures and bounded credential-free errors.
+The local coverage receipt for the CLI tree reports 1082/1082 lines and 184/184
+explicit branches, with all four production source files included. It is local
+candidate evidence, not current-head hosted checks, review approval or release.
+
+The organization already contains authentication implementations. Keyverse main
+at `7d9151cd` defines the RP contract; saju-caldav main at `fa72a2c8` implements
+JWT/JWKS verification. Keyverse PR103 at `5ac33256` has an operator-protected
+software/menu PDP candidate, not the least-privilege CalendarWeave runtime API
+that binds verified issuer/subject, exact action and calendar references to an
+authorized tenant. That missing contract remains a Keyverse-owned integration
+dependency. No software/menu allow is promoted to calendar-resource authority.
+
+This increment does not narrow the standalone-product objective to a CLI.
+HTTP/CalDAV, real issuer acceptance, purpose-bound authorization audit, production
+release/deployment, operated recovery and consumer parity remain incomplete.
+
 ## Open issue state
 
 Issue #2 remains the canonical commercialization tracker and stays open. #9 addresses only the generic RFC 5545 CLASS portion of `saju-caldav` parity. Current evidence still does not prove released CalDAV/provider parity, concrete service authentication, operated disaster recovery, privacy/retention/export/audit controls, versioned distribution, or consumer cutover.

@@ -59,14 +59,18 @@ CalDAV service exposure, recurrence, scheduling, provider adapters, authenticati
 
 ## Start here
 
-There is no supported installation command yet because the current protected product is not released. To evaluate or integrate CalendarWeave without inventing a runtime contract, use the documentation in this order:
+This integration candidate can be built and invoked locally. Follow the [local operator quickstart](docs/local-operator-quickstart.md) for a real PostgreSQL-backed create/read/update path. It is a trusted OS-operator tool, not an authenticated network service or CalDAV endpoint. The default branch is still a seed and there is no released production installation contract.
+
+For architecture and integration, use the documentation in this order:
 
 1. Read [`ARCHITECTURE.md`](ARCHITECTURE.md) for the product boundary and integration ownership map.
 2. Read the [documentation home](docs/index.md) for the current architecture, research, and gap evidence.
 3. Review [`docs/adr/0001-context-map-and-calendar-ownership.md`](docs/adr/0001-context-map-and-calendar-ownership.md) before designing a consumer adapter.
 4. Treat open implementation pull requests as candidate evidence until their behavior reaches the protected default branch and a versioned release is published.
 
-A copy-paste install or API quickstart will be added only when there is a released executable contract to install and call.
+The quickstart installs from the candidate source, preserves original iCalendar bytes, and demonstrates strong-ETag updates. Only explicit `init` applies schema changes. Database connections are restricted to UNIX sockets or explicit loopback IPs because the retained adapter has no TLS transport. The operator must establish the authorized tenant scope; a tenant argument is not authentication.
+
+Keyverse and existing ecosystem consumers provide authentication implementations, but their presence is not a completed CalendarWeave integration. The current Keyverse software/menu decision candidate does not return an issuer/action/calendar-resource-bound authorized tenant. The missing least-privilege runtime resource decision remains an explicit dependency, not an invented endpoint.
 
 ## Integration context
 
