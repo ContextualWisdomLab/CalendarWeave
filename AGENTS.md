@@ -15,6 +15,7 @@ CalendarWeave owns the reusable **generic calendar-resource** bounded context. I
 
 - Implement RFC 5545 VEVENT and RFC 4791 CalDAV collection semantics test-first.
 - Treat `DTEND` and positive RFC 5545 `DURATION` as the bounded v1 interval alternatives under ADR-0007; keep unsupported recurrence, floating time, `VTIMEZONE`, and unhandled parameters fail-closed until explicitly versioned.
+- Preserve RFC 5545 `CLASS` as calendar-owner privacy intent under ADR-0008: omitted means `PUBLIC`, standard values are case-insensitive, unknown registered/experimental token values fail-private, and classification never substitutes for authorization.
 - Add RFC 5546 iTIP, RFC 6578 sync and RFC 6638 scheduling only as explicit versioned capabilities with discovery/fail-closed behavior.
 - Keep standalone service and module/package consumption paths both possible through published contracts.
 - Organize source by real bounded-context responsibility; provider SDKs belong behind adapters/Anti-Corruption Layers, never inside domain entities.
@@ -30,6 +31,7 @@ CalendarWeave owns the reusable **generic calendar-resource** bounded context. I
 - Copy Naruon Google Calendar code or `saju-caldav` Radicale code as the implementation strategy; extract required behavior into consumer parity fixtures instead.
 - Put mail/threading, project/task semantics, LineageWeave ontology, Four Pillars calculation, saju scoring, GRC registries or identity-provider behavior in this repository.
 - Let consumers read CalendarWeave application tables directly or leak provider DTOs into their domain models.
+- Treat RFC 5545 `CLASS` as an access-control decision; enforcement stays in Authorization Admission and the external policy authority.
 - Delete an existing consumer compatibility path before a released CalendarWeave contract proves parity.
 - Self-approve, force-push, bypass protection, request Copilot, or use `COPILOT_GITHUB_TOKEN`.
 

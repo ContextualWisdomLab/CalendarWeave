@@ -2,94 +2,106 @@
 
 ## Snapshot
 
-Protected `main` remains the seed commit `d972ccae6225716bdff7210a1fed808c01d32689`; CalendarWeave still has no released runtime, package, service, container, CalDAV endpoint, or consumer migration. PRs #3/#4/#5 have merged into the open PR #1 branch, which now carries the Rust core, PostgreSQL adapter and bounded IANA `TZID`. PR #6 authorization admission, #7 logical recovery, #8 bounded RFC 5545 `DURATION`, and #9 `CLASS` remain stacked candidates.
+Protected `main` remains the seed `d972ccae6225716bdff7210a1fed808c01d32689`; the live repository is non-fork and protected main still contains no released runtime, package, service, container, CalDAV endpoint, provider adapter, or consumer migration. PRs #3/#4/#5 have merged into the open PR #1 branch, which now carries the Rust core, PostgreSQL adapter and bounded IANA `TZID`. PR #6 authorization admission, #7 logical recovery, #8 bounded RFC 5545 `DURATION`, and #9 RFC 5545 `CLASS` privacy intent remain stacked candidates.
 
-The repository remains genuinely early-stage because the buyer-facing workflow is not installable or operated and foundational service authentication, release/deployment, CalDAV/provider parity, privacy/audit operation, measured recovery, and downstream migration are still missing. The bounded `DURATION` slice materially narrows a real producer-interoperability gap without widening the product boundary.
+CalendarWeave remains genuinely very early-stage because the buyer-facing workflow is not installable or operated and foundational service authentication, release/deployment, CalDAV/provider parity, privacy/audit operation, measured recovery, and downstream migration are still missing. PR #9 is a bounded commercialization intervention because `saju-caldav` parity explicitly needs privacy-classification semantics and RFC 5545 provides a standard contract that can be added without widening CalendarWeave into disclosure policy.
 
 ## Product responsibility and DDD boundary
 
 | Responsibility | Owner / bounded context | Current evidence |
 | --- | --- | --- |
-| Calendar collections, events, UID/revision/ETag invariants, RFC 5545 resource semantics | CalendarWeave / Calendar Resource Core | PR #3/#5 content is integrated on PR #1; PR #8 is a later `DURATION` candidate; none is released |
-| Calendar operation admission | CalendarWeave / Authorization Admission | PR #6 candidate; tenant-free issuer/subject evidence, exact resource request, authorization-derived tenant |
+| Calendar collections, events, UID/revision/ETag invariants, RFC 5545 resource semantics | CalendarWeave / Calendar Resource Core | #3/#5 content is integrated on PR #1; #8/#9 are later semantic candidates; none is released |
+| Calendar privacy intent | CalendarWeave / Calendar Resource Core | #9 `EventClass` projection from canonical iCalendar; not authorization |
+| Calendar operation admission | CalendarWeave / Authorization Admission | #6 candidate; tenant-free issuer/subject evidence, exact resource request, authorization-derived tenant |
 | Identity/federation and external authorization policy | Keyverse | External authority behind `CalendarAuthorizationPort`; no copied identity/policy store |
-| Relational durability/concurrency | CalendarWeave / PostgreSQL adapter | PR #4 content is integrated on PR #1, with 3NF append-only revisions and row-locked conditional updates |
-| Logical recovery | CalendarWeave / operations boundary | PR #7 candidate; checksum-before-restore and invariant drill, not PITR/HA/RPO/RTO evidence |
+| Relational durability/concurrency | CalendarWeave / PostgreSQL adapter | #4 content is integrated on PR #1, with 3NF append-only revisions and row-locked conditional updates |
+| Logical recovery | CalendarWeave / operations boundary | #7 candidate; checksum-before-restore and invariant drill, not PITR/HA/RPO/RTO evidence |
 | CalDAV/provider interoperability and synchronization | CalendarWeave / interoperability adapters | Target responsibility; no released endpoint/provider parity |
 | Workspace commitment/conflict/resolution policy | Naruon | Supporting consumer context behind a versioned Calendar Port/ACL |
 | Calendar/evidence composition | LineageWeave | Read-only composition/deep-link responsibility; no calendar store or mathematical computation |
 | Saju scoring/explanation/publication intent | `saju-caldav` | Separate domain; generic CalDAV compatibility migrates only after CalendarWeave parity |
 | Deterministic Four Pillars computation | `four-pillars` | Separate mathematical product responsibility |
 
-Core subdomain: governed calendar-resource semantics and mutation/revision invariants. Supporting subdomains: authorization admission plus CalDAV/provider interoperability. Generic/external capabilities: identity/federation, PostgreSQL, telemetry, deployment platform. `CalendarCollection` owns collection-scoped membership; `CalendarEvent` exposes the current immutable-UID revision projection. `TenantId` and tenant-free `ExternalIdentity` are value objects. `CalendarAuthorizationRequest` carries action and opaque resource references only. External identity/provider DTOs terminate behind ACLs.
+Core subdomain: governed calendar-resource semantics and mutation/revision invariants. Supporting subdomains: Authorization Admission plus CalDAV/provider interoperability. Generic/external capabilities: identity/federation, PostgreSQL, telemetry and deployment platform. `CalendarCollection` owns collection-scoped membership. `CalendarEvent` is the current immutable-UID revision projection. `TenantId` and tenant-free `ExternalIdentity` are value objects. `EventClass` is descriptive privacy intent. `CalendarAuthorizationRequest` carries action and opaque resource references only. External identity/provider representations terminate behind ACLs.
 
-Item-level transactions remain minimal. Event create is idempotent by collection + RFC UID. Conditional update locks one event row and advances one revision only under the expected strong ETag. Recovery is outside ordinary aggregate transactions and must restore rather than redefine these invariants.
+Transactions remain item-scoped: create is idempotent by collection + RFC UID; conditional update locks one event row and advances one revision under the expected strong ETag. `CLASS` is derived from the canonical immutable `icalendar_payload`; #9 deliberately adds no duplicate persistence column or transaction boundary.
 
 ## Current feature specification
 
-The candidate v1 Calendar Resource Core supports tenant-scoped collection create and VEVENT create/update/list/get. Supported VEVENTs require RFC 5545 `VERSION:2.0`, `PRODID`, UID, UTC `DTSTAMP`, start, summary, and exactly one explicit interval form. Standard confirmed/tentative/cancelled status and non-negative `SEQUENCE` are bounded optional fields.
+The candidate Calendar Resource Core supports tenant-scoped collection create and VEVENT create/update/list/get. Supported VEVENTs require RFC 5545 `VERSION:2.0`, `PRODID`, UID, UTC `DTSTAMP`, start, summary, and exactly one explicit interval form. Case-insensitive standard confirmed/tentative/cancelled status and non-negative `SEQUENCE` are bounded optional fields.
 
-Time/interval candidate behavior is explicit:
+Time and privacy behavior is explicit:
 
-- `DTEND` remains supported for UTC, all-day DATE, and matching bounded IANA `TZID` intervals, with non-increasing intervals rejected.
-- PR #8 adds positive RFC 5545 `DURATION` as the alternative to `DTEND`; both present, neither present, or duplicate interval fields fail closed under the CalendarWeave v1 profile.
-- `DURATION` accepts RFC 5545 week/day/hour/minute/second lexical ordering, including explicit `+`; the optional-minute grammar is covered explicitly (`PT1H30S` and `P1DT1H30S`), while negative, zero, years, calendar months, fractions, mixed week/date forms, and reordered units fail closed.
-- DATE `DTSTART` accepts only day/week duration forms as required by RFC 5545.
-- The existing bounded profile continues to reject floating local time, unknown/ambiguous/nonexistent named local starts, `VTIMEZONE`, recurrence, and uninterpreted duration parameters until separately versioned. PR #8 now contains direct DURATION regressions for unknown, ambiguous, and nonexistent named starts rather than relying only on predecessor TZID tests.
-- Nominal duration is preserved in the original iCalendar payload; this slice does not invent a fixed-second end across DST discontinuities.
+- `DTEND` supports UTC, all-day DATE, and matching bounded IANA `TZID` intervals, rejecting non-increasing intervals.
+- #8 accepts positive RFC 5545 `DURATION` as the alternative to `DTEND`; both, neither, duplicate, negative/zero, calendar-month/year, fractional, reordered, and unsupported-parameter forms fail closed under the bounded v1 profile.
+- DATE `DTSTART` accepts only day/week duration forms. Named-timezone starts reuse the existing ambiguity/nonexistence/unknown-zone fail-closed contract.
+- #9 accepts one optional RFC 5545 `CLASS`. Omission projects as `PUBLIC`; `PUBLIC`/`PRIVATE`/`CONFIDENTIAL` are case-insensitive; valid unrecognized IANA/experimental token values project as `PRIVATE`; IANA/non-standard parameters remain interoperable; duplicate, empty or non-token values fail malformed.
+- Singleton validation unfolds RFC 5545 folded content lines before counting properties, so a folded second `CLASS` cannot overwrite the first value inside the dependency parser.
+- `CalendarEvent::classification()` revalidates the same complete bounded event profile before returning a classification, so a manually forged projection with an unsupported property or other invalid raw payload cannot recover apparently trusted privacy metadata.
+- `CLASS` is calendar-owner intent only. A public value cannot override denied/unavailable authorization, and private/confidential values do not themselves grant or enforce access.
+- Floating local time, `VTIMEZONE`, recurrence/free-busy expansion and unversioned provider/CalDAV capabilities remain outside the candidate profile.
 
-Persistence remains 3NF with descriptive multiword `snake_case` objects: `calendar_collection`, `calendar_event`, and `calendar_event_revision`. No duration table or denormalized computed-end column is added; both adapters use the shared parser and the durable revision stores `icalendar_payload`.
+Persistence remains 3NF with descriptive multiword `snake_case` objects: `calendar_collection`, `calendar_event`, and `calendar_event_revision`. Canonical event content remains `icalendar_payload`; neither DURATION nor CLASS introduces a parallel relational source of truth.
 
-## Exact-stack evidence and status
+## Exact stack evidence observed in this iteration
 
-| Lane | Exact evidence observed in this iteration | Status / next verification |
+| Lane | Exact head / evidence | Current status / next verification |
 | --- | --- | --- |
-| protected `main` | `d972ccae6225716bdff7210a1fed808c01d32689` | Seed only; protected by active organization required-workflow/review ruleset |
-| PR #1 `docs/adr-baseline` | PRs #3/#4/#5 merged into this branch; current candidate covers revision exhaustion and malformed named-timezone end values | Executable core, PostgreSQL and bounded `TZID` are integrated but not on protected `main`; replacement exact-head required checks and review govern its merge |
+| protected `main` | `d972ccae6225716bdff7210a1fed808c01d32689` | seed only; no released product surface |
+| #1 `docs/adr-baseline` | `5c85765adb3e3d9514e387921103d2fda7944c18`; Tests `36686207005` and SAST `36686206972` succeeded; Security Scan `36686206813` failed closed on Dependency Review HTTP 403; CodeQL `36686206923` skipped | Executable core, PostgreSQL and bounded `TZID` are integrated but not on protected `main`; `.github#810` owns the dependency-review availability blocker and independent approval is still absent |
 | PRs #3/#4/#5 | Closed and merged into PR #1 branch | Their successful exact-head Rust and coverage checks supported branch integration; PR #1 needs its own checks before protected-main merge |
-| PR #6 `feat/authorization-admission-v1` | Open candidate based on PR #1 | Current-head hosted checks and semantic review remain required; the open review thread requests hosted check evidence |
-| PR #7 `feat/postgres-recovery-v1` | Open candidate stacked after #6 | The RED recovery contract preceded production scripts; current-head rust, coverage and recovery checks remain required |
-| PR #8 `feat/rfc5545-duration-v1` | Open candidate stacked after #7 | Test-first `DURATION` lane with one mutual-exclusion validator and explicit grammar/parameter edge fixtures; replacement exact-head rust, coverage and recovery checks remain required |
-| PR #9 `feat/rfc5545-class-v1` | Open candidate stacked after #8 | `CLASS` privacy intent is not an authorization decision; current-head checks and review remain required |
-| Central runner acquisition | ContextualWisdomLab/.github #712 | Organization-level queue evidence has shown explicit Ubuntu jobs unassigned; do not rewrite leaf runner selectors or claim queued as passing |
+| #6 `feat/authorization-admission-v1` | `3b2b3a532df4663dd8d2af9e4b6cca444fdfee93`; Tests `36686514860` succeeded and its hosted-evidence thread is resolved | Independent approval is absent; the central Security/SAST/CodeQL suite did not materialize on the stacked base |
+| #7 `feat/postgres-recovery-v1` | `f31728a5a9009e65bc560dabdf450fa940bd809a`; Tests `36686710710` succeeded | RED recovery contract preceded production scripts; independent approval and stacked-base central scans remain required |
+| #8 `feat/rfc5545-duration-v1` | `88844ad55c94cf3ed4f362bf4bea5ef579a20513`; Tests `36688373491` succeeded | Test-first `DURATION` lane and exact-head repository checks are GREEN; independent approval and stacked-base central scans remain required |
+| #9 `feat/rfc5545-class-v1` | `65dee82a88ad5f12973d32843eddd45bb887781f`; Tests `36892959099` passed `rust`, `coverage`, and `recovery`. Test-only `ffea407601571da76498cd1deb5bc84cae27aa5f` exposes folded duplicate `CLASS`; production repair `dcd510a424b2c2d137260e71684558f6a502d390` reuses the dependency parser's unfolding contract | Local Rust 1.97.1 RED→GREEN is observed. Hosted run `37111484172` for the RED head failed before all three jobs acquired a runner (`steps=[]`, no log artifact), so it is not product evidence. Exact-head hosted checks, independent approval, and stacked-base central scans remain required |
+| central security foundation | ContextualWisdomLab/.github #810 and #2073 | #810 owns fail-closed Dependency Review availability; #2073 owns missing exact-head central scans for feature-base stacked PRs. Leaf branches must not copy workflows, inherit predecessor receipts or weaken gates |
 
-The live CalendarWeave organization ruleset requires an approving review, stale-review dismissal, review-thread resolution, and central required workflows on the protected default branch. No self-approval, admin bypass, required-check weakening, force-push, or destructive rebase is permitted for commercialization progress.
+The live governance path requires exact-current-head checks/reviews. PRs #3/#4/#5 were marked Ready through the CLI and merged into PR #1 without self-approval, admin bypass or protection weakening.
 
-## PR #8 test-first and research traceability
+## PR #9 TDD and research traceability
 
-The primary RED contract is commit `7b22940c1b26f69a79b66a50de72e0a436821600`, which added `tests/rfc5545_duration.rs` while production still excluded `DURATION` and required `DTEND`. The production parser implementation followed in `0606f8b72e97c21b3d64945dc8b22a4688ea6358`. A later exact RFC grammar audit found that RFC 5545 permits the hour form to omit minutes while still including seconds; `c48b2019031d579646ad7aa1f57beab492d85acd` added `PT1H30S`/`P1DT1H30S` plus named-timezone edge regressions before `7e356a6f4eaa0fb60722b23e6c9953fcdea9df02` repaired the parser. This preserves RED→GREEN ordering for the discovered edge defect independently of hosted-runner availability.
+The initial RED commit `b91602811a231c726ab5fbc5a2e0a1af894e9346` added `tests/rfc5545_classification.rs` before production CLASS support. A standards audit then corrected overly narrow assumptions before final production behavior: `18d3ea264d2f0c3bfeea10e5af6fa01ff4bbe706` requires case-insensitive standard values, extension-parameter interoperability, and fail-private handling for valid unknown registered/experimental values. `707fcecdb45a273028b2d7966888c3a507d268d5` implements that corrected Rust contract.
 
-ADR-0007 and `docs/doctoring/rfc5545-duration-baseline.md` bind the behavior to RFC 5545 sections 3.3.6, 3.6.1, and 3.8.2.5. RFC 5545 defines `DTEND` and `DURATION` as mutually exclusive VEVENT alternatives, defines `DURATION` as positive, requires DATE-start durations to be day/week forms, and distinguishes nominal day/week duration across time-scale discontinuities. CalendarWeave's additional requirement that one explicit interval form be present is an intentional bounded v1 product restriction, not represented as full RFC conformance.
+A subsequent exact-head static review found that the public classification accessor re-parsed only singleton/component/classification structure rather than the entire supported event profile. That meant a manually forged public `CalendarEvent` could retain a valid `CLASS` while gaining an unsupported property and still return a classification. `bfe078a556677ec99d76c87533bcbd5967836da6` added the RED regression first; `b12f95dee6b3a73f87a56316a48830f45ae3612b` then made the accessor reuse `parse_event` and moved the parsed classification into `ParsedEvent`, so classification now inherits the same fail-closed full-profile validation as event admission.
+
+The same standards review exposed an older interoperability defect outside the new `CLASS` projection: `STATUS` matched only uppercase spellings even though RFC 5545 enumerated values are case-insensitive. `d34cf18fb8037be144c44012c51c1d3f41065651` added the focused RED contract; hosted Tests `36892549369` failed in both `rust` and `coverage` with `MalformedCalendar` while recovery remained green. `4e26597bb52650dd64a5d40ca92376194bfb0b1f` changes only the three standard `STATUS` comparisons to ASCII case-insensitive matching and preserves duplicate, parameterized and unknown-value rejection.
+
+Exact-head review then found that duplicate-singleton validation counted physical lines before RFC 5545 unfolding while `icalendar` 0.17.13 unfolded before parsing. A folded second `CLASS` could therefore replace the first parsed value. Test-only `ffea407601571da76498cd1deb5bc84cae27aa5f` adds space- and tab-continuation regressions; local Rust 1.97.1 execution observed the expected RED `Ok(CalendarEvent)` result. `dcd510a424b2c2d137260e71684558f6a502d390` makes the shared singleton counter reuse `icalendar::parser::unfold`. The focused regression, all six classification tests, the 48-test all-feature suite, formatting, warning-fatal Clippy, and warning-fatal rustdoc pass locally. Hosted run `37111484172` did not execute a step and is retained only as runner-start incident evidence.
+
+ADR-0008 and `docs/doctoring/rfc5545-class-privacy-baseline.md` bind the candidate to RFC 5545 sections 3.1 and 3.8.1.3. RFC 5545 defines omitted CLASS as PUBLIC, permits IANA/non-standard parameters, requires unrecognized iana-token/x-name values to be treated like PRIVATE, and explicitly warns that CLASS is owner intent rather than an enforcement statement. The same RFC states enumerated values are case-insensitive. These semantics are represented directly rather than replaced with a local heuristic.
+
+The classification projection is derived from the validated immutable event payload. This keeps persistence normalized and avoids introducing a synchronization invariant between a second classification column and canonical iCalendar content.
 
 ## Open issue state
 
-Issue #2 remains the canonical commercialization tracker and must stay open. It maps to real product, security, reliability, interoperability, release, and ecosystem gaps. PR #8 addresses only the explicit `DURATION` portion of the RFC 5545 capability gap. The issue now contains a current PR #8 progress comment; no current evidence proves a versioned release, production authentication, CalDAV/provider parity, measured disaster recovery, privacy/audit operation, or downstream migration, so closure would be false.
+Issue #2 remains the canonical commercialization tracker and stays open. #9 addresses only the generic RFC 5545 CLASS portion of `saju-caldav` parity. Current evidence still does not prove released CalDAV/provider parity, concrete service authentication, operated disaster recovery, privacy/retention/export/audit controls, versioned distribution, or consumer cutover.
 
 ## Commercialization gaps
 
 | Gap | Owner | Current evidence | Smallest next action | Completion evidence |
 | --- | --- | --- | --- | --- |
-| Real service authentication / Keyverse integration | CalendarWeave + Keyverse boundary | PR #6 proves only an in-process authorization ACL | Implement concrete verified issuer/token/session adapter without copying identity policy into CalendarWeave | Invalid signature/issuer/algorithm/audience/subject/time, tenant/resource mismatch, dependency failure, and successful authorized operation fixtures |
-| Operated durability | CalendarWeave deployment boundary | PR #7 logical restore candidate only | Add encrypted retained remote backups, migration rollback, WAL/PITR where required, monitoring, and measured exercises | Exact measured RPO/RTO/PITR/restore evidence; no logical-backup overclaim |
-| `VTIMEZONE` and remaining RFC 5545 profile | Calendar Resource Core | PR #5 bounded IANA registry lookup + PR #8 DURATION | Add standards-backed `VTIMEZONE` slice test-first; keep floating/recurrence separate until justified | Real RFC fixtures and edge cases under exact-head coverage |
-| CalDAV/provider parity | CalendarWeave interoperability | No endpoint/provider adapter released | Add protocol ACL only after core contract stabilizes | Real CalDAV/provider interoperability fixtures and reversible migration evidence |
-| Privacy/content + authorization audit | CalendarWeave + deployment | Calendar text and backup artifacts may contain necessary PII | Define purpose/retention/access/export/audit controls and encrypted backup access | CSAP/SOC 2-oriented control map and operated evidence without certification claims |
-| Release/package/service | CalendarWeave | No versioned public artifact | Define package/service contract, compose deployment, SBOM/provenance, rollback | Immutable versioned artifact/service plus real install/call path |
-| Consumer migration | Naruon / `saju-caldav` / LineageWeave | Compatibility implementations remain | Characterization tests then versioned ACLs after release | No direct table coupling; parity/security/failure semantics and reversible cutover |
-| Hosted exact-head verification | ContextualWisdomLab/.github #712 | #6/#7/#8 require current-head hosted execution | Continue central runner-capacity/root-cause lane; do not create leaf no-op churn | Current-head terminal successful repository + semantic/security checks |
-| Review lifecycle | CalendarWeave PR stack | #3/#4/#5 were marked Ready through the CLI and merged into PR #1; #6/#7/#8 remain Draft | Advance each executable candidate only with current-head checks and review evidence | Ordinary Ready transition and downstream semantic review dispatch without bypass |
+| Service authentication / Keyverse integration | CalendarWeave + Keyverse | #6 proves an in-process authorization ACL only | implement a concrete verified issuer/token/session adapter behind the existing port | invalid signature/issuer/algorithm/audience/subject/time, dependency failure, tenant/resource mismatch and authorized fixtures |
+| Operated durability | CalendarWeave deployment | #7 logical restore candidate only | encrypted retained remote backups, WAL/PITR where required, rollback/monitoring and measured exercises | exact measured RPO/RTO/PITR/restore evidence; no logical-backup overclaim |
+| `VTIMEZONE` / remaining RFC 5545 profile | Calendar Resource Core | bounded IANA zone + DURATION + CLASS candidates | add standards-backed `VTIMEZONE` slice test-first | real RFC fixtures and DST edges under exact-head coverage |
+| CalDAV/provider parity | CalendarWeave interoperability | no endpoint/provider adapter released | add protocol/provider ACL after the core contract stabilizes | real provider/CalDAV fixtures and reversible migration evidence |
+| Privacy/content + authorization audit | CalendarWeave + deployment | CLASS intent candidate, necessary calendar PII, logical backup | define purpose/retention/access/export/audit and encrypted backup access | CSAP/SOC 2-oriented control map plus operated evidence without certification claims |
+| Release/package/service | CalendarWeave | no versioned artifact | define package/service contract, compose deployment, SBOM/provenance and rollback | immutable versioned artifact/service plus real install/call path |
+| Consumer migration | Naruon / `saju-caldav` / LineageWeave | compatibility implementations remain | characterization tests then versioned ACLs after release | parity/security/failure semantics, no direct table coupling, reversible cutover |
+| Hosted exact-head verification | ContextualWisdomLab/.github #712 | CalendarWeave #6/#7/#8/#9 runner-backed jobs can remain queued/unassigned | repair central queue-amplification owner path and revalidate unchanged leaf heads | terminal current-head repository + semantic/security evidence |
+| Review lifecycle | CalendarWeave PR stack | #3/#4/#5 were marked Ready through the CLI and merged into PR #1; #6/#7/#8/#9 remain Draft | advance each executable candidate with current-head checks and review evidence, without bypass or no-op churn | ordinary Ready state and downstream independent review dispatch |
 
-## Quality, security, persistence, and operability invariants
+## Quality, security, persistence and operability invariants
 
 - Behavior changes begin with executable RED contracts; owned production statement/branch coverage and public-doc coverage target 100%.
-- No deprecation-warning suppression, production synthetic data, self-approval, force-push, destructive rebase, or protection weakening.
-- Calendar math/psychometrics do not belong here; LineageWeave remains free of mathematical computation that belongs in a dedicated mathematical owner.
-- Authorization precedes untrusted calendar parsing/mutation. Cross-tenant and absent-resource observations stay indistinguishable at the core boundary.
+- No deprecation-warning suppression, production synthetic data, self-approval, force-push, destructive rebase, routine bypass, or protection weakening.
+- CalendarWeave and LineageWeave contain no mathematical/psychometric computation that belongs in dedicated mathematical owners.
+- Authorization precedes untrusted calendar parsing/mutation. Cross-tenant and absent-resource observations remain indistinguishable at the core boundary.
+- RFC 5545 `CLASS` is not access-control authority; valid unknown tokens fail-private to avoid accidental widening, public classification projections must pass the full supported-event validator before being trusted, and singleton counts must use the same unfolded content-line representation as the parser.
 - No raw bearer token/provider credential becomes a Calendar Resource attribute or ordinary telemetry field.
-- Necessary calendar PII is protected by least privilege, purpose/tenant isolation, encryption, retention and audit rather than masking that destroys calendar utility. Test/docs identities remain synthetic/anonymized.
-- Relational persistence stays normalized and item-level UPSERT/idempotency semantics remain explicit. Event writes lock only the item that needs serialization.
-- Logical backup digest verification is integrity evidence, not encryption, signature, provenance, PITR, HA, or RPO/RTO evidence.
-- Web p95/load targets do not apply until a web/service surface exists; once one does, asynchronous handling and realistic k6 evidence become release gates.
+- Necessary calendar PII is protected through least privilege, purpose/tenant isolation, encryption, retention, export/access audit and test anonymization rather than blanket masking that breaks calendar work.
+- Relational persistence stays normalized; item-level idempotency/UPSERT semantics remain explicit; writes lock only the required item.
+- Logical-backup digest verification is integrity evidence, not encryption, provenance, PITR, HA or RPO/RTO evidence.
+- Web p95/k6 gates become applicable only when a web/service surface exists; no absent web surface is represented as load-tested.
 - The revision counter must fail closed at `u64::MAX` without replacing the current event; named-timezone parsing must reject malformed local end values before interval comparison.
 - Exact-head checks, live reviews/threads, rulesets and concurrent writer state are re-read after every branch move; stale/queued/cancelled evidence is non-passing.
 - Logical restore must remain fail-closed on missing/malformed/tampered evidence and prove post-restore relational invariants. A successful logical drill alone cannot satisfy production recovery/PITR/RPO/RTO gates.
@@ -97,18 +109,20 @@ Issue #2 remains the canonical commercialization tracker and must stay open. It 
 
 ## Required development order
 
-1. Reacquire exact-head repository and central semantic/security evidence for #6, #7, and #8 while continuing independent work instead of waiting on the runner queue.
-2. Review PR #1's integrated core and advance #6/#7/#8 only after their current-head checks; never substitute admin bypass or self-approval.
-3. Establish concrete Keyverse/service authentication and operated recovery/release evidence.
-4. Add the next standards-backed `VTIMEZONE` capability and then CalDAV/provider interoperability fixtures, keeping recurrence/floating semantics explicitly versioned.
-5. Migrate Naruon, `saju-caldav`, and LineageWeave only after released parity evidence exists.
+1. Reacquire exact-head repository and semantic/security evidence for #6/#7/#8/#9 while independently reducing real product gaps.
+2. Review PR #1's integrated core and advance #6/#7/#8/#9 only after their current-head checks; preserve stack order and ordinary review gates.
+3. Repair the central queue-amplification owner path without leaf churn, then revalidate unchanged CalendarWeave heads.
+4. Establish concrete Keyverse/service authentication and operated recovery/release evidence.
+5. Add the next standards-backed `VTIMEZONE` capability, then CalDAV/provider interoperability fixtures.
+6. Migrate Naruon, `saju-caldav`, and LineageWeave only after released parity evidence exists.
 
 ## Evidence references
 
-- CalendarWeave PRs #1, #3, #4, #5, #6, #7, #8 and issue #2.
-- ADR-0001 through ADR-0007.
+- CalendarWeave PRs #1, #3, #4, #5, #6, #7, #8, #9 and issue #2.
+- ADR-0001 through ADR-0008.
 - `docs/doctoring/identity-authorization-admission-baseline.md`.
 - `docs/doctoring/postgresql-logical-recovery-baseline.md`.
 - `docs/doctoring/rfc5545-duration-baseline.md`.
-- ContextualWisdomLab/.github #712 for current hosted-runner acquisition evidence.
-- RFC 5545: Desruisseaux, B. (Ed.). (2009). *Internet calendaring and scheduling core object specification (iCalendar)*. RFC Editor. https://doi.org/10.17487/RFC5545
+- `docs/doctoring/rfc5545-class-privacy-baseline.md`.
+- ContextualWisdomLab/.github #712 for organization runner-queue causal evidence.
+- Desruisseaux, B. (Ed.). (2009). *Internet calendaring and scheduling core object specification (iCalendar)* (RFC 5545). RFC Editor. https://doi.org/10.17487/RFC5545

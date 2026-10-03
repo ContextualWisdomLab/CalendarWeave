@@ -95,6 +95,35 @@ fn event_status_is_preserved_without_importing_conflict_policy() {
 }
 
 #[test]
+fn event_status_enumerated_values_are_case_insensitive() {
+    let tenant = tenant("synthetic-tenant-a");
+    let mut service = InMemoryCalendarService::new();
+    let collection = service
+        .create_collection(&tenant, "Synthetic calendar")
+        .unwrap();
+
+    for (status_text, expected) in [
+        ("confirmed", EventStatus::Confirmed),
+        ("TeNtAtIvE", EventStatus::Tentative),
+        ("cancelled", EventStatus::Cancelled),
+    ] {
+        let payload = UTC_EVENT
+            .replace("synthetic-event-1", &format!("synthetic-{status_text}"))
+            .replace(
+                "SUMMARY:Synthetic planning review",
+                &format!("SUMMARY:Synthetic planning review\r\nSTATUS:{status_text}"),
+            );
+        assert_eq!(
+            service
+                .create_event(&tenant, &collection.collection_ref, &payload)
+                .unwrap()
+                .status,
+            expected
+        );
+    }
+}
+
+#[test]
 fn cross_tenant_access_is_indistinguishable_from_an_unknown_collection() {
     let mut service = InMemoryCalendarService::new();
     let owner = tenant("synthetic-tenant-a");

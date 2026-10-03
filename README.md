@@ -4,19 +4,20 @@
 
 **Governed calendar resources, iCalendar semantics, and interoperable scheduling infrastructure.**
 
-CalendarWeave is the ContextualWisdomLab calendar-resource product: the reusable home for versioned calendar collections and events, iCalendar semantics, revisions and synchronization evidence, timezone and recurrence behavior, CalDAV interoperability, and provider-facing calendar adapters.
+CalendarWeave is the ContextualWisdomLab calendar-resource product: the reusable home for versioned calendar collections and events, iCalendar semantics, revisions and synchronization evidence, timezone and recurrence behavior, privacy intent, CalDAV interoperability, and provider-facing calendar adapters.
 
 It exists so products can consume one explicit calendar contract instead of each embedding its own calendar store, provider SDK behavior, or protocol interpretation.
 
 ## Why CalendarWeave
 
-Calendar systems become difficult to integrate when resource identity, revisions, time semantics, provider behavior, and business decisions are mixed together. CalendarWeave keeps the reusable calendar-resource layer narrow and governed.
+Calendar systems become difficult to integrate when resource identity, revisions, time semantics, privacy intent, provider behavior, and business decisions are mixed together. CalendarWeave keeps the reusable calendar-resource layer narrow and governed.
 
 | Need | CalendarWeave responsibility |
 | --- | --- |
 | Stable calendar data | Calendar collections, resources, event identity and revision evidence |
 | Interoperability | RFC 5545 iCalendar and RFC 4791 CalDAV semantics as versioned capabilities |
 | Correct time behavior | Explicit timezone, interval and later recurrence semantics that fail closed when unsupported or ambiguous |
+| Privacy intent | RFC 5545 classification metadata without pretending it replaces authentication or authorization |
 | Provider integration | Calendar-provider adapters behind product-owned ports rather than provider DTOs in the domain model |
 | Safe composition | Versioned contracts for consumers instead of direct database coupling |
 | Auditability | Synchronization, mutation and authorization evidence at the calendar boundary |
@@ -25,7 +26,7 @@ Calendar systems become difficult to integrate when resource identity, revisions
 
 CalendarWeave is under active foundation development. The protected default branch is still a seed repository; this implementation stack defines and proves candidate product behavior, not a released runtime.
 
-The implementation stack is building a tenant-scoped Calendar Resource Core, durable persistence, strict RFC 5545 time semantics, authorization admission, and recoverability evidence before any production service, CalDAV endpoint, provider parity, or consumer-migration claim is made. Candidate behavior in open pull requests is not protected-main or release evidence.
+The implementation stack is building a tenant-scoped Calendar Resource Core, durable persistence, strict RFC 5545 time/privacy semantics, authorization admission, and recoverability evidence before any production service, CalDAV endpoint, provider parity, or consumer-migration claim is made. Candidate behavior in open pull requests is not protected-main or release evidence.
 
 ### What you can rely on today
 
@@ -36,13 +37,13 @@ The implementation stack is building a tenant-scoped Calendar Resource Core, dur
 
 ### Executable candidate evidence
 
-The implementation stack contains a Rust v0.1 application port for tenant-scoped collection creation and strict RFC 5545 VEVENT create, conditional-update, list, and get behavior. It accepts UTC, all-day, and bounded matching-IANA-`TZID` intervals; the newest candidate also accepts positive RFC 5545 `DURATION` values as the explicit alternative to `DTEND`, including DATE-start day/week restrictions. The core preserves standard event status, returns opaque event references with revision/ETag evidence, and fails closed for malformed, cross-tenant, stale-revision, ambiguous/nonexistent local-time, and unsupported requests.
+The implementation stack contains a Rust v0.1 application port for tenant-scoped collection creation and strict RFC 5545 VEVENT create, conditional-update, list, and get behavior. It accepts UTC, all-day, and bounded matching-IANA-`TZID` intervals; the stacked candidates also accept positive RFC 5545 `DURATION` values as the explicit alternative to `DTEND` and RFC 5545 `CLASS` privacy intent. `CLASS` omission projects as `PUBLIC`, standard values are case-insensitive, and valid unknown registered/experimental tokens fail-private. The core preserves standard event status, returns opaque event references with revision/ETag evidence, and fails closed for malformed, cross-tenant, stale-revision, ambiguous/nonexistent local-time, and unsupported requests.
 
-The durable-store slice adds a 3NF PostgreSQL adapter with restart-stable event identity, append-only revisions, item-level create idempotency by collection plus RFC UID, and row-locked strong-ETag updates. A later candidate adds a digest-verified logical backup/restore drill, but that is not an operated disaster-recovery, PITR, HA, or RPO/RTO claim.
+The durable-store slice adds a 3NF PostgreSQL adapter with restart-stable event identity, append-only revisions, item-level create idempotency by collection plus RFC UID, and row-locked strong-ETag updates. Classification remains derived from the canonical validated iCalendar revision rather than duplicated into a second persistence column. A later candidate adds a digest-verified logical backup/restore drill, but that is not an operated disaster-recovery, PITR, HA, or RPO/RTO claim.
 
-Authorization admission uses externally verified issuer/subject evidence without allowing the caller to choose a tenant. The trusted authorization decision derives tenant scope for the exact calendar action/resource request before parsing or mutation. This is candidate application-boundary evidence, not a released authentication service or Keyverse token-verification adapter.
+Authorization admission uses externally verified issuer/subject evidence without allowing the caller to choose a tenant. The trusted authorization decision derives tenant scope for the exact calendar action/resource request before parsing or mutation. RFC 5545 `CLASS` records calendar-owner access intent only and cannot grant permission or override a deny/unavailable authorization decision. This is candidate application-boundary evidence, not a released authentication service or Keyverse token-verification adapter.
 
-These executable candidates are not protected-main, a released package or service, a CalDAV endpoint, provider parity, `VTIMEZONE`/recurrence support, or a consumer migration contract.
+These executable candidates are not protected-main, a released package or service, a CalDAV endpoint, provider parity, `VTIMEZONE`/recurrence support, a disclosure-policy implementation, or a consumer migration contract.
 
 ## First releasable vertical
 
@@ -50,11 +51,11 @@ The first release target is intentionally small and testable:
 
 1. create a tenant-scoped calendar collection;
 2. create and retrieve an RFC 5545 VEVENT with stable identity and revision evidence;
-3. preserve supported timezone and explicit `DTEND`/`DURATION` interval semantics fail-closed;
+3. preserve supported timezone, explicit `DTEND`/`DURATION` interval, and privacy-intent semantics fail-closed;
 4. persist the resource through a durable adapter; and
 5. expose a versioned application contract that other products can consume without database coupling.
 
-CalDAV service exposure, recurrence, scheduling, provider adapters, authentication, operated backup/recovery, and broader synchronization capabilities become customer-facing only when their executable contracts and release evidence exist.
+CalDAV service exposure, recurrence, scheduling, provider adapters, authentication, operated backup/recovery, disclosure policy, and broader synchronization capabilities become customer-facing only when their executable contracts and release evidence exist.
 
 ## Start here
 
@@ -106,7 +107,7 @@ Calendar clients / product consumers
    durable storage      provider gateways
 ```
 
-Provider SDKs and legacy calendar implementations belong behind adapters. Business-specific scheduling decisions, scoring, lineage semantics, identity administration, and unrelated workflow policy stay outside this bounded context.
+Provider SDKs and legacy calendar implementations belong behind adapters. Business-specific scheduling decisions, scoring, lineage semantics, identity administration, disclosure policy, and unrelated workflow policy stay outside this bounded context.
 
 ## Quality and release posture
 

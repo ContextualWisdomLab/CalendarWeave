@@ -16,15 +16,19 @@ and resource references to an external authorization port, and uses only the
 authorization-derived tenant when delegating to the core. Authorization precedes
 calendar parsing. The stacked ADR-0006 candidate adds a PostgreSQL logical
 backup/restore operation with private artifacts, checksum-before-restore and an
-executable invariant recovery drill. ADR-0007 adds the next bounded RFC 5545
+executable invariant recovery drill. ADR-0007 adds a bounded RFC 5545
 interoperability slice: positive `DURATION` values become an alternative to
 `DTEND` while remaining mutually exclusive, DATE starts accept only day/week
 durations, and the same UTC/IANA start validator is reused by both persistence
-adapters. These remain candidate evidence rather than protected-main or
-released-product evidence; ADR-0006 specifically does not claim an operated
-RPO/RTO, WAL/PITR, HA/failover, service authentication, CalDAV deployment, or
-consumer migration, and ADR-0007 does not claim `VTIMEZONE`, recurrence,
-floating-time, free/busy expansion, or full RFC 5545 conformance.
+adapters. ADR-0008 adds RFC 5545 `CLASS` as a typed privacy-intent projection:
+omission defaults to `PUBLIC`, standard enumerated values are case-insensitive,
+and valid unknown registered/experimental tokens fail-private. `CLASS` remains
+descriptive metadata and never becomes authorization authority. These remain
+candidate evidence rather than protected-main or released-product evidence;
+ADR-0006 specifically does not claim an operated RPO/RTO, WAL/PITR, HA/failover,
+service authentication, CalDAV deployment, or consumer migration, while
+ADR-0007/0008 do not claim `VTIMEZONE`, recurrence, floating-time, free/busy
+expansion, CalDAV ACLs, provider sharing policy, or full RFC 5545 conformance.
 
 ## Product responsibility
 
@@ -33,7 +37,7 @@ CalendarWeave is the reusable calendar bounded context for ContextualWisdomLab. 
 CalendarWeave owns:
 
 - calendar collections, calendar resources, event identity and revisions;
-- RFC 5545 iCalendar parsing/serialization and recurrence/timezone semantics;
+- RFC 5545 iCalendar parsing/serialization, privacy-intent classification, recurrence/timezone semantics;
 - RFC 4791 CalDAV collection/query/access behavior;
 - scheduling/synchronization protocol behavior when implemented, including capability discovery, ETag/scheduling-tag preconditions, sync tokens, free/busy and iTIP/CalDAV scheduling contracts;
 - provider adapters for calendar systems such as CalDAV servers, Google Calendar or Outlook when those adapters become supported;
@@ -80,7 +84,7 @@ LineageWeave consumes calendar information or deep-links into CalendarWeave for 
 
 `saju-caldav` owns birth/profile inputs, cultural/astronomical calculation choices that belong to that product, pair/time candidate rules, candidate scoring/explanation, and the decision to request publication of selected candidate times. CalendarWeave owns generic calendar publication, collections, iCalendar/CalDAV protocol state and provider synchronization.
 
-The current `saju-caldav` Radicale/CalDAV stack predates a production-ready CalendarWeave contract. It remains a compatibility implementation until CalendarWeave can prove equivalent create/list/get/update/delete, recurrence/timezone, privacy classification, idempotency, authorization and failure behavior. After parity, the generic Radicale/CalDAV responsibility should move behind a CalendarWeave adapter and be removed from `saju-caldav`; saju-specific event content policy remains in `saju-caldav`.
+The current `saju-caldav` Radicale/CalDAV stack predates a production-ready CalendarWeave contract. It remains a compatibility implementation until CalendarWeave can prove equivalent create/list/get/update/delete, recurrence/timezone, privacy classification, idempotency, authorization and failure behavior. ADR-0008/PR #9 establish only the generic RFC 5545 `CLASS` candidate contract; they are not proof of consumer parity or disclosure-policy equivalence. After parity, the generic Radicale/CalDAV responsibility should move behind a CalendarWeave adapter and be removed from `saju-caldav`; saju-specific event content policy remains in `saju-caldav`.
 
 ### CalendarWeave ↔ Four Pillars
 
@@ -93,7 +97,7 @@ CalendarWeave does not interpret or calculate Four Pillars. `four-pillars` remai
 | Calendar collection/event resource and revision | CalendarWeave | Naruon, LineageWeave, saju-caldav, external clients |
 | Calendar operation admission | CalendarWeave | Tenant-free external identity + resource-aware typed request; authorization authority derives tenant; no token verifier or local policy store |
 | Identity, federation and external authorization policy | Keyverse | CalendarWeave consumes verified issuer/subject identity and resource-aware policy decisions through an ACL |
-| iCalendar / CalDAV protocol semantics | CalendarWeave | Consumer products use ports/adapters; candidate supports explicit `DTEND` and positive RFC 5545 `DURATION` interval forms |
+| iCalendar / CalDAV protocol semantics | CalendarWeave | Consumer products use ports/adapters; candidate supports explicit `DTEND`, positive RFC 5545 `DURATION`, and RFC 5545 `CLASS` privacy intent |
 | Provider calendar sync and revision receipts | CalendarWeave | Consumer-specific authorization intent remains with consumer |
 | PostgreSQL logical recovery operation | CalendarWeave | ADR-0006 / PR #7 candidate proves digest-verified logical restore; deployment owns backup store, keys, cadence, RPO/RTO and WAL/PITR/HA |
 | Workspace commitment/conflict decision | Naruon | References CalendarWeave event/resource evidence |
@@ -107,6 +111,7 @@ CalendarWeave does not interpret or calculate Four Pillars. `four-pillars` remai
 - `CalendarCollection` is the collection identity boundary and owns membership of event resources in one tenant scope.
 - `CalendarEvent` represents the current read projection of an immutable-UID event resource; revision transitions remain conditional on the current strong ETag.
 - A CalendarWeave v1 VEVENT carries exactly one explicit interval form: `DTEND` or positive RFC 5545 `DURATION`. DATE-valued starts permit only day/week durations. Duration remains part of the validated source payload rather than a second persisted aggregate or guessed fixed-second end timestamp.
+- Optional `CLASS` is part of the validated source payload and projects through `EventClass`; omitted means public and valid unrecognized tokens project private. It is an event metadata value, not an authorization aggregate or access-control decision.
 - `TenantId` and `ExternalIdentity` are value objects. `ExternalIdentity` has no tenant authority and never becomes a persisted calendar aggregate merely because admission used it.
 - `CalendarAuthorizationRequest` is a request value carrying only action and opaque target references required by authorization; it is not persisted as a calendar aggregate.
 - `AuthorizedCalendarService` is an application/domain-facing service, not an aggregate. It obtains authorization before domain processing and delegates one item-level operation at a time using only the returned tenant.
@@ -138,15 +143,17 @@ The following is a target logical model, **not a claim that protected `main` alr
 - `provider_event_mappings`: CalendarWeave event FK, provider identity, opaque provider resource identity and current revision evidence.
 - `calendar_sync_cursors`: collection/provider scope, sync token/cursor and recorded time.
 
-The executable PostgreSQL candidate uses the singular multiword equivalents `calendar_collection`, `calendar_event` and `calendar_event_revision`; any eventual schema-name consolidation must preserve migration compatibility rather than silently renaming released persistence. No repeating groups. Provider DTOs and credentials do not become domain entities. Any future authorization-decision persistence requires its own descriptive multiword object and retention/access contract rather than adding a generic one-word `id` table.
+The executable PostgreSQL candidate uses the singular multiword equivalents `calendar_collection`, `calendar_event` and `calendar_event_revision`; any eventual schema-name consolidation must preserve migration compatibility rather than silently renaming released persistence. No repeating groups. Provider DTOs and credentials do not become domain entities. Any future authorization-decision persistence requires its own descriptive multiword object and retention/access contract rather than adding a generic one-word `id` table. `CLASS` remains inside canonical revision payload until a demonstrated query/indexing requirement justifies a schema change; no redundant classification column is introduced by ADR-0008.
 
 ## Trust
 
 Fail closed without purpose-limited identity and authorization. Consume Keyverse through an infrastructure ACL; do not stand up a local IdP or treat an arbitrary tenant string as proof of permission. `ExternalIdentity` carries only verified issuer/subject evidence. The authorization adapter evaluates the exact action/resource request and derives the tenant used by the core. Authorization precedes parsing and mutation at the application boundary. Necessary attendee/organizer data remains usable under least privilege, tenant/purpose isolation, encryption, retention and access/export audit rather than blanket masking. Provider credentials, raw Authorization data and bearer tokens are never domain attributes or ordinary telemetry.
 
+RFC 5545 `CLASS` is calendar-owner privacy intent, not an authorization grant. A private/confidential value cannot create permission, and a public value cannot override a denied/unavailable authorization decision. Unknown valid classification tokens project as private so extension values do not silently widen disclosure.
+
 Calendar backup artifacts can contain the same necessary calendar PII. ADR-0006 therefore protects logical backup artifacts with owner-only file permissions and verifies their digest before restore; it does not mask data in a way that would make recovery unusable. Production storage encryption, access policy, retention, key management and remote durability remain explicit deployment gates.
 
-The current ADR-0005 candidate proves only an in-process admission contract. HTTP/service authentication, token verification, durable authorization/audit evidence, rate limiting, production Keyverse integration, CSAP/SOC 2 operational evidence, and released interoperability remain open. ADR-0006 similarly proves only a bounded logical recovery operation, not PITR, HA or an operated disaster-recovery objective. ADR-0007 validates and preserves duration semantics only; it does not compute free/busy or recurrence end instants and therefore does not create a DST or scheduling-policy claim beyond the RFC-backed input profile.
+The current ADR-0005 candidate proves only an in-process admission contract. HTTP/service authentication, token verification, durable authorization/audit evidence, rate limiting, production Keyverse integration, CSAP/SOC 2 operational evidence, and released interoperability remain open. ADR-0006 similarly proves only a bounded logical recovery operation, not PITR, HA or an operated disaster-recovery objective. ADR-0007 validates and preserves duration semantics only; it does not compute free/busy or recurrence end instants and therefore does not create a DST or scheduling-policy claim beyond the RFC-backed input profile. ADR-0008 validates and projects classification intent only; it does not implement disclosure enforcement, CalDAV ACLs, retention, export, or provider-sharing policy.
 
 ## Citations
 

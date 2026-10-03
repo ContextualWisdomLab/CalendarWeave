@@ -301,7 +301,7 @@ fn authorized_tenant_is_derived_by_the_policy_adapter_not_the_caller() {
         .expect("event creation succeeds");
 
     assert_eq!(
-        service.get_event(&outsider, &collection.collection_ref, &created.event_ref,),
+        service.get_event(&outsider, &collection.collection_ref, &created.event_ref),
         Err(CalendarError::NotFound)
     );
     assert_eq!(
