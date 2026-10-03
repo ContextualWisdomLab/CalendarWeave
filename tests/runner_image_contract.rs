@@ -23,6 +23,12 @@ fn tests_workflow_uses_explicit_ubuntu_24_04_runners() {
 }
 
 #[test]
+fn database_jobs_use_an_explicit_loopback_address_for_the_operator() {
+    assert_eq!(TESTS_WORKFLOW.matches("@127.0.0.1:5432/").count(), 2);
+    assert!(!TESTS_WORKFLOW.contains("@localhost:5432/"));
+}
+
+#[test]
 fn tests_workflow_cancels_superseded_exact_heads() {
     assert!(
         TESTS_WORKFLOW.contains(
