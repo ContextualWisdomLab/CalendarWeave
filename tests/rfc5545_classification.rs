@@ -63,6 +63,20 @@ fn class_is_singleton_and_rejects_non_token_values() {
 }
 
 #[test]
+fn folded_duplicate_class_values_fail_closed() {
+    for folded_duplicate in [
+        "CLASS:PRIVATE\r\nCL\r\n ASS:PUBLIC",
+        "CLASS:PRIVATE\r\nCL\r\n\tASS:PUBLIC",
+    ] {
+        assert_eq!(
+            create_event(&payload(Some(folded_duplicate))),
+            Err(CalendarError::MalformedCalendar),
+            "folded duplicate CLASS must fail closed: {folded_duplicate:?}"
+        );
+    }
+}
+
+#[test]
 fn classification_accessor_fails_closed_for_a_forged_projection() {
     let mut event = create_event(&payload(Some("CLASS:PRIVATE"))).expect("valid test event");
     event.icalendar = payload(Some("CLASS:NOT PRIVATE"));
