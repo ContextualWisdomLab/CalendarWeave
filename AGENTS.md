@@ -16,6 +16,7 @@ CalendarWeave owns the reusable **generic calendar-resource** bounded context. I
 - Implement RFC 5545 VEVENT and RFC 4791 CalDAV collection semantics test-first.
 - Treat `DTEND` and positive RFC 5545 `DURATION` as the bounded v1 interval alternatives under ADR-0007; keep unsupported recurrence, floating time, `VTIMEZONE`, and unhandled parameters fail-closed until explicitly versioned.
 - Preserve RFC 5545 `CLASS` as calendar-owner privacy intent under ADR-0008: omitted means `PUBLIC`, standard values are case-insensitive, unknown registered/experimental token values fail-private, and classification never substitutes for authorization.
+- Preserve the ADR-0010 Calendar Port v0.1 metadata profile: admit optional single parameter-free `DESCRIPTION` and standard case-insensitive `TRANSP`, preserve original bytes, reject all metadata parameters as unsupported, and do not infer a full TEXT validator or free/busy policy from preservation tests.
 - Add RFC 5546 iTIP, RFC 6578 sync and RFC 6638 scheduling only as explicit versioned capabilities with discovery/fail-closed behavior.
 - Keep standalone service and module/package consumption paths both possible through published contracts.
 - The local operator is an intermediate trusted-OS-user path, not the final authenticated service. Restrict its retained non-TLS adapter to absolute UNIX sockets or explicit loopback IPs; schema migration is explicit `init` only.

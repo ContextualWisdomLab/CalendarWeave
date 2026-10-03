@@ -48,6 +48,18 @@ bound authorized tenant. The missing least-privilege runtime resource decision
 must be completed by its policy owner before network callers are admitted.
 Existing consumer compatibility implementations remain unchanged.
 
+## Bounded event metadata source candidate
+
+ADR-0010 extends the existing Calendar Port v0.1 input profile, not the schema
+or authorization boundary. The shared parser admits optional single parameter-free
+`DESCRIPTION` and case-insensitive standard `TRANSP`, retaining original bytes.
+Description content remains consumer-owned. No new full TEXT validator, typed
+accessor, busy-policy projection, or free/busy service is implied. Omitted
+transparency remains omitted; its normative default is `OPAQUE`. All parameters
+remain unsupported even where RFC 5545 permits them. The twelve exact synthetic
+consumer-output fixtures establish only this slice, not released CalDAV parity,
+authenticated service, consumer migration, or current-head hosted acceptance.
+
 ## Product responsibility
 
 CalendarWeave is the reusable calendar bounded context for ContextualWisdomLab. It owns generic calendar-resource semantics and calendar interoperability, not the business reason an event exists.

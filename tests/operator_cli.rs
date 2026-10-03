@@ -537,6 +537,8 @@ fn storage_and_output_failures_are_nonzero() {
 
 #[test]
 fn ordinary_storage_and_help_output_failures_are_nonzero() {
+    // This test owns its schema prerequisite; sibling tests may run in any order.
+    assert!(database_cli(&["init"]).status.success());
     assert_eq!(
         database_cli(&["create-collection", "cli-failure", " "]).stderr,
         b"calendarweave: InvalidInput\n"

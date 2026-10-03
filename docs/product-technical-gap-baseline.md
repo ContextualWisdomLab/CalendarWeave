@@ -99,6 +99,24 @@ This increment does not narrow the standalone-product objective to a CLI.
 HTTP/CalDAV, real issuer acceptance, purpose-bound authorization audit, production
 release/deployment, operated recovery and consumer parity remain incomplete.
 
+## 2026-10-03 bounded metadata source increment
+
+ADR-0010 extends the Calendar Port v0.1 source candidate with optional single
+parameter-free `DESCRIPTION` and `TRANSP`. The original payload remains canonical;
+no schema or dependency changes are introduced. Standard transparency values are
+case-insensitive; omission is preserved, with RFC default `OPAQUE` but no busy-policy
+projection. All parameters remain `UnsupportedCapability`, including RFC-permitted
+`LANGUAGE`/`ALTREP`. Description fixtures prove parser acceptance and preservation,
+not a complete independent TEXT grammar validator.
+
+Twelve exact synthetic consumer serializer outputs and the metadata tests exercise
+this slice, revision/tenant boundaries, and the real admission wrapper with synthetic
+authorization decisions. Historical native RED/GREEN receipts are distinct from
+normal Cargo acceptance; final exact-source gate receipts must be read separately.
+Independent review, hosted CI, package release, authenticated standalone service,
+CalDAV collections, DELETE, unconditional PUT, full consumer parity, and cutover
+remain open. No existing consumer compatibility implementation is removed.
+
 ## Open issue state
 
 Issue #2 remains the canonical commercialization tracker and stays open. #9 addresses only the generic RFC 5545 CLASS portion of `saju-caldav` parity. Current evidence still does not prove released CalDAV/provider parity, concrete service authentication, operated disaster recovery, privacy/retention/export/audit controls, versioned distribution, or consumer cutover.

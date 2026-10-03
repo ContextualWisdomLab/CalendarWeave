@@ -14,8 +14,18 @@ use uuid::Uuid;
 pub mod admission;
 pub mod postgres_store;
 
-const ALLOWED_EVENT_PROPERTIES: [&str; 9] = [
-    "UID", "DTSTAMP", "DTSTART", "DTEND", "DURATION", "SUMMARY", "SEQUENCE", "STATUS", "CLASS",
+const ALLOWED_EVENT_PROPERTIES: [&str; 11] = [
+    "UID",
+    "DTSTAMP",
+    "DTSTART",
+    "DTEND",
+    "DURATION",
+    "SUMMARY",
+    "SEQUENCE",
+    "STATUS",
+    "CLASS",
+    "DESCRIPTION",
+    "TRANSP",
 ];
 
 /// A bounded failure returned by the calendar-resource application port.
@@ -387,7 +397,7 @@ pub(crate) struct ParsedEvent {
 }
 
 pub(crate) fn parse_event(input: &str) -> Result<ParsedEvent, CalendarError> {
-    if !input.ends_with("\r\n") || input.replace("\r\n", "").contains('\n') {
+    if !input.ends_with("\r\n") || input.replace("\r\n", "").contains(['\r', '\n']) {
         return Err(CalendarError::MalformedCalendar);
     }
     validate_singleton_properties(input)?;
@@ -416,6 +426,10 @@ pub(crate) fn parse_event(input: &str) -> Result<ParsedEvent, CalendarError> {
     let summary = required_text(event.properties().get("SUMMARY"))?;
     let status = parse_status(event.properties().get("STATUS"))?;
     let classification = parse_class(event.properties().get("CLASS"))?;
+    validate_event_metadata(
+        event.properties().get("DESCRIPTION"),
+        event.properties().get("TRANSP"),
+    )?;
     validate_utc("DTSTAMP", event.properties().get("DTSTAMP"))?;
     validate_event_interval(
         event.properties().get("DTSTART"),
@@ -445,24 +459,60 @@ pub(crate) fn validated_display_name(display_name: &str) -> Result<String, Calen
 
 fn validate_singleton_properties(input: &str) -> Result<(), CalendarError> {
     const REQUIRED_ONCE: [&str; 6] = ["VERSION", "PRODID", "UID", "DTSTAMP", "DTSTART", "SUMMARY"];
+    let unfolded = unfold(input);
+    // The dependency skips whitespace between properties. Reject malformed
+    // logical framing before it can swallow a line our singleton guard misses.
+    // split_terminator excludes only the final CRLF, not interior empty lines.
+    if unfolded
+        .split_terminator("\r\n")
+        .any(|line| line.is_empty() || line.starts_with([' ', '\t']))
+    {
+        return Err(CalendarError::MalformedCalendar);
+    }
     for required in REQUIRED_ONCE {
-        if property_count(input, required) != 1 {
+        if property_count(&unfolded, required) != 1 {
             return Err(CalendarError::MalformedCalendar);
         }
     }
-    for optional in ["SEQUENCE", "STATUS", "CLASS", "DTEND", "DURATION"] {
-        if property_count(input, optional) > 1 {
+    for optional in [
+        "SEQUENCE",
+        "STATUS",
+        "CLASS",
+        "DTEND",
+        "DURATION",
+        "DESCRIPTION",
+        "TRANSP",
+    ] {
+        if property_count(&unfolded, optional) > 1 {
             return Err(CalendarError::MalformedCalendar);
         }
     }
     Ok(())
 }
 
-fn property_count(input: &str, property: &str) -> usize {
-    unfold(input)
+fn property_count(unfolded: &str, property: &str) -> usize {
+    unfolded
         .split("\r\n")
-        .filter(|line| property_name(line) == Some(property))
+        .filter(|line| property_name(line).is_some_and(|name| name.eq_ignore_ascii_case(property)))
         .count()
+}
+
+fn validate_event_metadata(
+    description: Option<&Property>,
+    transparency: Option<&Property>,
+) -> Result<(), CalendarError> {
+    for property in [description, transparency].into_iter().flatten() {
+        if !property.params().is_empty() {
+            return Err(CalendarError::UnsupportedCapability);
+        }
+    }
+    if let Some(property) = transparency {
+        let value = property.value();
+        if !value.eq_ignore_ascii_case("OPAQUE") && !value.eq_ignore_ascii_case("TRANSPARENT") {
+            return Err(CalendarError::MalformedCalendar);
+        }
+    }
+    Ok(())
 }
 
 fn parse_status(property: Option<&Property>) -> Result<EventStatus, CalendarError> {

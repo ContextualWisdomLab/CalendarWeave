@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Add the ADR-0010 source-candidate Calendar Port v0.1 metadata profile: optional single parameter-free DESCRIPTION and case-insensitive OPAQUE/TRANSPARENT, original-byte preservation, folded-duplicate rejection, and explicit unsupported parameters without changing schema or dependencies.
+- Retain twelve exact synthetic consumer serializer fixtures with provenance, metadata boundary tests, and real admission-wrapper controls using synthetic authorization decisions; no release, deployed identity, free/busy, or consumer migration is claimed.
+
 - Add a working local PostgreSQL operator executable over the retained Calendar Port: explicit initialization, collection creation, original-byte VEVENT create/list/get, and strong-ETag update.
 - Preserve the complete CLASS/DURATION/admission/recovery stack and package preflight without rewriting predecessor branches.
 - Reject implicit, DNS, remote and hostaddr-override database targets before the non-TLS operator adapter connects; retain only explicit loopback IPs and absolute UNIX sockets.

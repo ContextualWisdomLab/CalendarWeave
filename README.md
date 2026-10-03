@@ -45,6 +45,17 @@ Authorization admission uses externally verified issuer/subject evidence without
 
 These executable candidates are not protected-main, a released package or service, a CalDAV endpoint, provider parity, `VTIMEZONE`/recurrence support, a disclosure-policy implementation, or a consumer migration contract.
 
+### Bounded metadata source candidate
+
+ADR-0010 extends Calendar Port v0.1 admission with optional, single,
+parameter-free `DESCRIPTION` and `TRANSP`. Original description bytes are
+preserved; transparency accepts `OPAQUE`/`TRANSPARENT` case-insensitively.
+Omitted transparency stays omitted (the RFC default is `OPAQUE`), without
+free/busy or busy-policy projection. All parameters remain explicitly unsupported,
+including RFC-permitted `LANGUAGE` and `ALTREP`. This is not a complete TEXT
+validator, released capability, or consumer cutover contract. See the
+[metadata profile](docs/adr/0010-rfc5545-event-metadata-profile.md).
+
 ## First releasable vertical
 
 The first release target is intentionally small and testable:

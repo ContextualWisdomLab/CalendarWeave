@@ -18,6 +18,8 @@ The project is in active foundation development. A public production endpoint, p
 - [Architecture decisions](adr/)
 - [RFC 5545 DURATION traceability](doctoring/rfc5545-duration-baseline.md)
 - [RFC 5545 CLASS privacy traceability](doctoring/rfc5545-class-privacy-baseline.md)
+- [Bounded metadata profile (source candidate)](adr/0010-rfc5545-event-metadata-profile.md)
+- [RFC 5545 event metadata traceability](doctoring/rfc5545-event-metadata-baseline.md)
 - [Product and technical gap baseline](product-technical-gap-baseline.md)
 - [DeepWiki](https://deepwiki.com/ContextualWisdomLab/CalendarWeave)
 
