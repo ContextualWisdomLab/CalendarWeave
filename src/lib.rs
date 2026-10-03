@@ -8,7 +8,7 @@ use std::str::FromStr;
 
 use chrono::{NaiveDate, NaiveDateTime, TimeZone};
 use chrono_tz::Tz;
-use icalendar::{Calendar, CalendarComponent, Component, Property};
+use icalendar::{Calendar, CalendarComponent, Component, Property, parser::unfold};
 use uuid::Uuid;
 
 pub mod admission;
@@ -459,7 +459,7 @@ fn validate_singleton_properties(input: &str) -> Result<(), CalendarError> {
 }
 
 fn property_count(input: &str, property: &str) -> usize {
-    input
+    unfold(input)
         .split("\r\n")
         .filter(|line| property_name(line) == Some(property))
         .count()
