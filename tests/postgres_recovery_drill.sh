@@ -8,32 +8,56 @@ restore_script="$repo_root/ops/postgres/restore_calendarweave.sh"
 [[ -f "$backup_script" ]] || { echo "missing production backup contract: $backup_script" >&2; exit 1; }
 [[ -f "$restore_script" ]] || { echo "missing production restore contract: $restore_script" >&2; exit 1; }
 
-postgres_container="$(docker ps --format '{{.ID}} {{.Image}}' | awk '$2 ~ /^postgres:18\.4-alpine/ {print $1; exit}')"
-[[ -n "$postgres_container" ]] || { echo "PostgreSQL 18.4 service container not found" >&2; exit 1; }
-
 tmp_dir="$(mktemp -d)"
 trap 'rm -rf "$tmp_dir"' EXIT
 
-cat >"$tmp_dir/pg_dump" <<EOF
+# CI runs the drill against the pinned PostgreSQL 18.4 service container. A
+# developer may instead point it at a disposable local cluster that they own by
+# setting CALENDARWEAVE_RECOVERY_LOCAL_SOCKET_DIR (UNIX socket directory),
+# CALENDARWEAVE_RECOVERY_LOCAL_PORT and CALENDARWEAVE_RECOVERY_LOCAL_PG_BIN_DIR;
+# the calendarweave_test database must already exist there.
+if [[ -n "${CALENDARWEAVE_RECOVERY_LOCAL_SOCKET_DIR:-}" ]]; then
+    local_pg_bin_dir="${CALENDARWEAVE_RECOVERY_LOCAL_PG_BIN_DIR:?CALENDARWEAVE_RECOVERY_LOCAL_PG_BIN_DIR is required in local mode}"
+    local_port="${CALENDARWEAVE_RECOVERY_LOCAL_PORT:-5432}"
+    database_url() {
+        printf 'postgresql://postgres@/%s?host=%s&port=%s' \
+            "$1" "$CALENDARWEAVE_RECOVERY_LOCAL_SOCKET_DIR" "$local_port"
+    }
+    run_psql() { "$local_pg_bin_dir/psql" "$@"; }
+    cat >"$tmp_dir/pg_dump" <<EOF
+#!/usr/bin/env bash
+exec "$local_pg_bin_dir/pg_dump" "\$@"
+EOF
+    cat >"$tmp_dir/pg_restore" <<EOF
+#!/usr/bin/env bash
+exec "$local_pg_bin_dir/pg_restore" "\$@"
+EOF
+else
+    postgres_container="$(docker ps --format '{{.ID}} {{.Image}}' | awk '$2 ~ /^postgres:18\.4-alpine/ {print $1; exit}')"
+    [[ -n "$postgres_container" ]] || { echo "PostgreSQL 18.4 service container not found" >&2; exit 1; }
+    database_url() { printf 'postgres://postgres:postgres@localhost:5432/%s' "$1"; }
+    run_psql() { run_psql "$@"; }
+    cat >"$tmp_dir/pg_dump" <<EOF
 #!/usr/bin/env bash
 exec docker exec "$postgres_container" pg_dump "\$@"
 EOF
-cat >"$tmp_dir/pg_restore" <<EOF
+    cat >"$tmp_dir/pg_restore" <<EOF
 #!/usr/bin/env bash
 exec docker exec -i "$postgres_container" pg_restore "\$@"
 EOF
+fi
 chmod 700 "$tmp_dir/pg_dump" "$tmp_dir/pg_restore"
 
-source_url="postgres://postgres:postgres@localhost:5432/calendarweave_test"
-restore_url="postgres://postgres:postgres@localhost:5432/calendarweave_restore"
-tamper_url="postgres://postgres:postgres@localhost:5432/calendarweave_tamper"
-admin_url="postgres://postgres:postgres@localhost:5432/postgres"
+source_url="$(database_url calendarweave_test)"
+restore_url="$(database_url calendarweave_restore)"
+tamper_url="$(database_url calendarweave_tamper)"
+admin_url="$(database_url postgres)"
 backup_path="$tmp_dir/calendarweave.dump"
 
 # Establish one real calendar aggregate and revision through the same migration
 # shipped with the PostgreSQL adapter. The values are synthetic and anonymous.
-docker exec -i "$postgres_container" psql "$source_url" < "$repo_root/migrations/0001_calendar_resource_store.sql"
-docker exec -i "$postgres_container" psql "$source_url" <<'SQL'
+run_psql "$source_url" < "$repo_root/migrations/0001_calendar_resource_store.sql"
+run_psql "$source_url" <<'SQL'
 BEGIN;
 INSERT INTO calendar_collection (collection_reference, tenant_reference, display_name)
 VALUES ('collection_recovery_fixture', 'tenant_recovery_fixture', 'Recovery fixture');
@@ -76,9 +100,9 @@ bash "$backup_script"
 
 # Restore only into explicitly named recovery databases; never overwrite the
 # source database during the drill.
-docker exec "$postgres_container" psql "$admin_url" -v ON_ERROR_STOP=1 \
+run_psql "$admin_url" -v ON_ERROR_STOP=1 \
     -c 'CREATE DATABASE calendarweave_restore'
-docker exec "$postgres_container" psql "$admin_url" -v ON_ERROR_STOP=1 \
+run_psql "$admin_url" -v ON_ERROR_STOP=1 \
     -c 'CREATE DATABASE calendarweave_tamper'
 
 CALENDARWEAVE_RESTORE_DATABASE_URL="$restore_url" \
@@ -86,7 +110,7 @@ CALENDARWEAVE_BACKUP_PATH="$backup_path" \
 PG_RESTORE_BIN="$tmp_dir/pg_restore" \
 bash "$restore_script"
 
-restored="$(docker exec -i "$postgres_container" psql "$restore_url" -At -v ON_ERROR_STOP=1 <<'SQL'
+restored="$(run_psql "$restore_url" -At -v ON_ERROR_STOP=1 <<'SQL'
 SELECT concat_ws('|',
     c.tenant_reference,
     c.collection_reference,
@@ -108,7 +132,7 @@ SQL
 
 # The restored schema must preserve item-level idempotency and current-revision
 # referential integrity rather than only recovering payload rows.
-constraint_count="$(docker exec -i "$postgres_container" psql "$restore_url" -At -v ON_ERROR_STOP=1 <<'SQL'
+constraint_count="$(run_psql "$restore_url" -At -v ON_ERROR_STOP=1 <<'SQL'
 SELECT count(*)
 FROM pg_constraint
 WHERE conname IN (
@@ -129,7 +153,7 @@ if CALENDARWEAVE_RESTORE_DATABASE_URL="$tamper_url" \
     exit 1
 fi
 
-tamper_table_count="$(docker exec -i "$postgres_container" psql "$tamper_url" -At -v ON_ERROR_STOP=1 <<'SQL'
+tamper_table_count="$(run_psql "$tamper_url" -At -v ON_ERROR_STOP=1 <<'SQL'
 SELECT count(*)
 FROM information_schema.tables
 WHERE table_schema = 'public'
