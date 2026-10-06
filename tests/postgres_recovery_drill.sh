@@ -48,6 +48,14 @@ EOF
 fi
 chmod 700 "$tmp_dir/pg_dump" "$tmp_dir/pg_restore"
 
+# Records that a restore executable was invoked without touching any database.
+cat >"$tmp_dir/pg_restore_sentinel" <<EOF
+#!/usr/bin/env bash
+touch "$tmp_dir/restore_invoked"
+exit 0
+EOF
+chmod 700 "$tmp_dir/pg_restore_sentinel"
+
 source_url="$(database_url calendarweave_test)"
 restore_url="$(database_url calendarweave_restore)"
 tamper_url="$(database_url calendarweave_tamper)"
@@ -143,6 +151,54 @@ SQL
 )"
 [[ "$constraint_count" == '2' ]]
 
+# Verification custody: the digest must be calculated from a private copy that
+# lives in an owner-only directory, and that copy must be removed on success and
+# on a checksum-mismatch exit. The recording SHA-256 executable captures the
+# path and modes it was given without changing the reported digest.
+cat >"$tmp_dir/sha256_recording" <<EOF
+#!/usr/bin/env bash
+set -euo pipefail
+printf '%s\n' "\$1" >"$tmp_dir/hashed_path"
+stat -c '%a' "\$(dirname "\$1")" >"$tmp_dir/hashed_dir_mode"
+stat -c '%a' "\$1" >"$tmp_dir/hashed_file_mode"
+sha256sum "\$@"
+EOF
+chmod 700 "$tmp_dir/sha256_recording"
+assert_private_custody() {
+    local hashed_path
+    hashed_path="$(cat "$tmp_dir/hashed_path")"
+    if [[ "$hashed_path" == "$1" ]]; then
+        echo 'digest was calculated by reopening the operator backup pathname' >&2
+        exit 1
+    fi
+    [[ "$(cat "$tmp_dir/hashed_dir_mode")" == '700' ]] || { echo 'private copy directory is not mode 0700' >&2; exit 1; }
+    [[ "$(cat "$tmp_dir/hashed_file_mode")" == '600' ]] || { echo 'private copy is not mode 0600' >&2; exit 1; }
+    [[ ! -e "$hashed_path" && ! -e "$(dirname "$hashed_path")" ]] || { echo 'private copy survived restore exit' >&2; exit 1; }
+}
+run_psql "$admin_url" -v ON_ERROR_STOP=1 -c 'CREATE DATABASE calendarweave_custody'
+custody_url="$(database_url calendarweave_custody)"
+CALENDARWEAVE_RESTORE_DATABASE_URL="$custody_url" \
+CALENDARWEAVE_BACKUP_PATH="$backup_path" \
+PG_RESTORE_BIN="$tmp_dir/pg_restore" \
+SHA256_BIN="$tmp_dir/sha256_recording" \
+bash "$restore_script"
+assert_private_custody "$backup_path"
+
+mismatch_backup="$tmp_dir/mismatch.dump"
+cp -- "$backup_path" "$mismatch_backup"
+printf '%064d\n' 0 >"$mismatch_backup.sha256"
+chmod 600 "$mismatch_backup" "$mismatch_backup.sha256"
+rm -f "$tmp_dir/restore_invoked" "$tmp_dir/hashed_path"
+mismatch_status=0
+CALENDARWEAVE_RESTORE_DATABASE_URL="$tamper_url" \
+CALENDARWEAVE_BACKUP_PATH="$mismatch_backup" \
+PG_RESTORE_BIN="$tmp_dir/pg_restore_sentinel" \
+SHA256_BIN="$tmp_dir/sha256_recording" \
+bash "$restore_script" || mismatch_status=$?
+[[ "$mismatch_status" -eq 65 ]] || { echo "checksum mismatch returned $mismatch_status instead of 65" >&2; exit 1; }
+[[ ! -e "$tmp_dir/restore_invoked" ]]
+assert_private_custody "$mismatch_backup"
+
 # Time-of-check/time-of-use: the archive that pg_restore consumes must be the
 # exact bytes whose digest was verified. Build a second, valid archive whose
 # event summary differs, then use an injected SHA-256 executable that reports
@@ -218,12 +274,6 @@ SQL
 [[ "$tamper_table_count" == '0' ]]
 
 # Validation failures must happen before the restore executable is called.
-cat >"$tmp_dir/pg_restore_sentinel" <<EOF
-#!/usr/bin/env bash
-touch "$tmp_dir/restore_invoked"
-exit 0
-EOF
-chmod 700 "$tmp_dir/pg_restore_sentinel"
 
 validation_backup="$tmp_dir/validation.dump"
 printf 'validation archive' >"$validation_backup"
