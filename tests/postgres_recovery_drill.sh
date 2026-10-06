@@ -199,6 +199,32 @@ bash "$restore_script" || mismatch_status=$?
 [[ ! -e "$tmp_dir/restore_invoked" ]]
 assert_private_custody "$mismatch_backup"
 
+# The private copy is also removed when pg_restore fails or the restore process
+# is terminated by a signal while pg_restore runs.
+cat >"$tmp_dir/pg_restore_failing" <<'EOF'
+#!/usr/bin/env bash
+cat >/dev/null
+exit 1
+EOF
+cat >"$tmp_dir/pg_restore_terminating" <<'EOF'
+#!/usr/bin/env bash
+cat >/dev/null
+kill -TERM "$PPID"
+exit 0
+EOF
+chmod 700 "$tmp_dir/pg_restore_failing" "$tmp_dir/pg_restore_terminating"
+for interrupted_restore in pg_restore_failing pg_restore_terminating; do
+    rm -f "$tmp_dir/hashed_path"
+    interrupted_status=0
+    CALENDARWEAVE_RESTORE_DATABASE_URL="$tamper_url" \
+    CALENDARWEAVE_BACKUP_PATH="$backup_path" \
+    PG_RESTORE_BIN="$tmp_dir/$interrupted_restore" \
+    SHA256_BIN="$tmp_dir/sha256_recording" \
+    bash "$restore_script" || interrupted_status=$?
+    [[ "$interrupted_status" -ne 0 ]] || { echo "$interrupted_restore unexpectedly succeeded" >&2; exit 1; }
+    assert_private_custody "$backup_path"
+done
+
 # Time-of-check/time-of-use: the archive that pg_restore consumes must be the
 # exact bytes whose digest was verified. Build a second, valid archive whose
 # event summary differs, then use an injected SHA-256 executable that reports
