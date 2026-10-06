@@ -117,6 +117,26 @@ Independent review, hosted CI, package release, authenticated standalone service
 CalDAV collections, DELETE, unconditional PUT, full consumer parity, and cutover
 remain open. No existing consumer compatibility implementation is removed.
 
+## 2026-10-05 isolated HTTP bootstrap increment
+
+An isolated successor exports base `775a5a15c0db4c788ddde57d97c3a14ac5daf5e9`
+without changing live worktrees or repository refs. It adds a real loopback-only
+`serve` command and a bounded HTTP/1.1 single-event GET transport contract.
+Default requests return 503 `AuthorizationUnavailable`; no calendar payload or
+ETag is released, and no lazy store factory is invoked while runtime producers
+are unavailable. It does not implement JWT verification, a local IdP, CalDAV or
+a caller-selected tenant grant. Existing operator security and init-only migration
+are unchanged. See `http-bootstrap-quickstart.md` for the request profile.
+
+The exact-source execution receipts belong to the isolated evidence packet,
+not this historical hosted-check table. A prior working build/native denial
+probe cannot certify later unbuilt bytes. Disk-capacity refusal, missing disposable
+PostgreSQL acceptance, final regressions and independent review must remain
+explicit in that packet. Authentication, an actual verified identity producer,
+resource-aware tenant decisions, authorized positives, full CRUD/CalDAV parity,
+statement/branch coverage (including F4), deployment and release remain open.
+No existing consumer implementation is removed.
+
 ## Open issue state
 
 Issue #2 remains the canonical commercialization tracker and stays open. #9 addresses only the generic RFC 5545 CLASS portion of `saju-caldav` parity. Current evidence still does not prove released CalDAV/provider parity, concrete service authentication, operated disaster recovery, privacy/retention/export/audit controls, versioned distribution, or consumer cutover.

@@ -14,6 +14,7 @@ The project is in active foundation development. A public production endpoint, p
 
 - [Repository overview](../README.md)
 - [Run the local operator](local-operator-quickstart.md) — real candidate build/create/read/update; not a network service
+- [Try the loopback HTTP bootstrap](http-bootstrap-quickstart.md) — bounded diagnostic GET; not authenticated or full CalDAV
 - [Architecture](../ARCHITECTURE.md)
 - [Architecture decisions](adr/)
 - [RFC 5545 DURATION traceability](doctoring/rfc5545-duration-baseline.md)

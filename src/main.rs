@@ -1,7 +1,8 @@
-//! Local operator entry point for the versioned Calendar Resource Core.
+//! Local operator and loopback HTTP bootstrap entry point.
 //!
-//! This executable trusts the operating-system user and an already-authorized
-//! tenant scope. It is not a network authentication or `CalDAV` boundary.
+//! Operator commands trust the OS user and an already-authorized tenant scope.
+//! The separate diagnostic HTTP transport admits no tenant and fails closed;
+//! this executable is not an authenticated or full `CalDAV` service.
 
 use std::{
     env,
@@ -10,9 +11,11 @@ use std::{
     process::ExitCode,
 };
 
+mod http_transport;
+
 use calendarweave::{CalendarPort, TenantId, postgres_store::PostgresCalendarService};
 
-const HELP: &str = "CalendarWeave local operator (v0.1)\n\nCommands:\n  init\n  create-collection TENANT NAME\n  create-event TENANT COLLECTION FILE\n  list-events TENANT COLLECTION\n  get-event TENANT COLLECTION EVENT\n  update-event TENANT COLLECTION EVENT ETAG FILE\n\nSet CALENDARWEAVE_DATABASE_URL to a PostgreSQL connection string.\nThis is not a CalDAV or authentication service. The OS operator must\nestablish an authorized tenant scope before using these commands.\n";
+const HELP: &str = "CalendarWeave local operator (v0.1)\n\nCommands:\n  serve LOOPBACK_IP:PORT [--once]\n  init\n  create-collection TENANT NAME\n  create-event TENANT COLLECTION FILE\n  list-events TENANT COLLECTION\n  get-event TENANT COLLECTION EVENT\n  update-event TENANT COLLECTION EVENT ETAG FILE\n\nSet CALENDARWEAVE_DATABASE_URL to a PostgreSQL connection string.\nThis is not a CalDAV or authentication service. The OS operator must\nestablish an authorized tenant scope before using these commands.\n";
 
 /// Run one trusted local operation and return a shell-visible result.
 ///
@@ -50,6 +53,14 @@ fn execute(arguments: &[String]) -> Result<String, String> {
     let arguments = arguments.iter().map(String::as_str).collect::<Vec<_>>();
     let operation = match arguments.as_slice() {
         ["--help" | "-h"] => return Ok(HELP.to_owned()),
+        ["serve", address] => {
+            http_transport::serve(address, false)?;
+            return Ok(String::new());
+        }
+        ["serve", address, "--once"] => {
+            http_transport::serve(address, true)?;
+            return Ok(String::new());
+        }
         ["init"] => Operation::Init,
         ["create-collection", tenant, name] => Operation::CreateCollection(tenant, name),
         ["list-events", tenant, collection] => Operation::ListEvents(tenant, collection),
