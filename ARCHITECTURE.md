@@ -48,6 +48,24 @@ bound authorized tenant. The missing least-privilege runtime resource decision
 must be completed by its policy owner before network callers are admitted.
 Existing consumer compatibility implementations remain unchanged.
 
+## Loopback HTTP bootstrap candidate
+
+The standalone `serve` command now binds only an explicit loopback IP and handles
+one bounded HTTP/1.1 single-event GET request per connection. This is a diagnostic
+prototype, not a TLS, authenticated, production HTTP or CalDAV service. Missing
+identity verification and resource-aware authorization runtime yield 503
+`AuthorizationUnavailable` before the lazy PostgreSQL factory can read database
+environment, connect, acquire storage, look up resources or migrate. Supported
+wire requests have no caller tenant argument. See
+`docs/http-bootstrap-quickstart.md` for the exact profile and diagnostic lifecycle.
+
+This isolated successor is not protected-main or released-product evidence.
+Verified issuer/token/trust configuration, a concrete identity producer and a
+least-privilege exact-resource tenant decision remain external integration gates.
+Negative transport tests do not prove authorized-read parity. Existing operator
+commands retain their trusted OS-user semantics and explicit init-only migration.
+Statement/branch coverage and independent review remain required, not waived.
+
 ## Bounded event metadata source candidate
 
 ADR-0010 extends the existing Calendar Port v0.1 input profile, not the schema

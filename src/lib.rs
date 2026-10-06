@@ -12,6 +12,7 @@ use icalendar::{Calendar, CalendarComponent, Component, Property, parser::unfold
 use uuid::Uuid;
 
 pub mod admission;
+pub mod http_bootstrap;
 pub mod postgres_store;
 
 const ALLOWED_EVENT_PROPERTIES: [&str; 11] = [
