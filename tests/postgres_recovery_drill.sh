@@ -143,6 +143,61 @@ SQL
 )"
 [[ "$constraint_count" == '2' ]]
 
+# Time-of-check/time-of-use: the archive that pg_restore consumes must be the
+# exact bytes whose digest was verified. Build a second, valid archive whose
+# event summary differs, then use an injected SHA-256 executable that reports
+# the real digest of what it was given and immediately renames the substitute
+# archive over the operator-supplied backup pathname. A restore that reopens the
+# pathname after verification would load the unverified substitute.
+substitute_backup="$tmp_dir/substitute.dump"
+run_psql "$source_url" -v ON_ERROR_STOP=1 \
+    -c "UPDATE calendar_event_revision SET summary_text = 'Substituted unverified event' WHERE event_reference = 'event_recovery_fixture'"
+"$tmp_dir/pg_dump" --format=custom --no-owner --no-privileges "$source_url" >"$substitute_backup"
+run_psql "$source_url" -v ON_ERROR_STOP=1 \
+    -c "UPDATE calendar_event_revision SET summary_text = 'Recovery fixture event' WHERE event_reference = 'event_recovery_fixture'"
+[[ -s "$substitute_backup" ]]
+if cmp -s "$substitute_backup" "$backup_path"; then
+    echo 'substitute archive must differ from the verified archive' >&2
+    exit 1
+fi
+
+cat >"$tmp_dir/sha256_then_swap" <<EOF
+#!/usr/bin/env bash
+set -euo pipefail
+sha256sum "\$@"
+if [[ ! -e "$tmp_dir/swap_done" ]]; then
+    : >"$tmp_dir/swap_done"
+    mv -f -- "$substitute_backup" "$backup_path"
+fi
+EOF
+chmod 700 "$tmp_dir/sha256_then_swap"
+run_psql "$admin_url" -v ON_ERROR_STOP=1 -c 'CREATE DATABASE calendarweave_swap'
+swap_url="$(database_url calendarweave_swap)"
+
+swap_status=0
+CALENDARWEAVE_RESTORE_DATABASE_URL="$swap_url" \
+CALENDARWEAVE_BACKUP_PATH="$backup_path" \
+PG_RESTORE_BIN="$tmp_dir/pg_restore" \
+SHA256_BIN="$tmp_dir/sha256_then_swap" \
+bash "$restore_script" || swap_status=$?
+[[ -e "$tmp_dir/swap_done" ]] || { echo 'swap hook was not exercised' >&2; exit 1; }
+
+swap_summaries="$(run_psql "$swap_url" -At -v ON_ERROR_STOP=1 <<'SQL'
+SELECT coalesce(string_agg(summary_text, ',' ORDER BY summary_text), '<none>')
+FROM calendar_event_revision
+WHERE to_regclass('public.calendar_event_revision') IS NOT NULL;
+SQL
+)" || swap_summaries='<no restored schema>'
+if [[ "$swap_status" -eq 0 ]]; then
+    if [[ "$swap_summaries" != 'Recovery fixture event' ]]; then
+        echo "TOCTOU: restore reported success but loaded '$swap_summaries' instead of the verified archive" >&2
+        exit 1
+    fi
+else
+    echo "TOCTOU: restore of a verified archive failed with status $swap_status after the pathname was swapped" >&2
+    exit 1
+fi
+
 # Tampering must be detected before pg_restore can mutate a target database.
 printf 'tamper' >> "$backup_path"
 if CALENDARWEAVE_RESTORE_DATABASE_URL="$tamper_url" \
