@@ -35,7 +35,25 @@ if [[ ! "$expected_digest" =~ ^[0-9a-f]{64}$ ]]; then
     exit 65
 fi
 
-actual_digest="$($sha256_bin "$backup_path" | awk 'NR == 1 {print $1}')"
+# Open the operator-supplied archive exactly once. Every later step uses the
+# bytes read from this single open file description, never the pathname again,
+# so replacing the pathname after this point cannot change what is verified or
+# restored. The bytes are copied into an owner-only private directory because
+# a stream cannot be rewound for a second reader.
+umask 077
+exec {backup_fd}<"$backup_path"
+private_dir="$(mktemp -d "${TMPDIR:-/tmp}/calendarweave-restore.XXXXXX")"
+cleanup() {
+    rm -rf -- "$private_dir"
+}
+trap cleanup EXIT
+chmod 700 "$private_dir"
+private_copy="$private_dir/verified.dump"
+cat <&"$backup_fd" >"$private_copy"
+exec {backup_fd}<&-
+chmod 600 "$private_copy"
+
+actual_digest="$($sha256_bin "$private_copy" | awk 'NR == 1 {print $1}')"
 actual_digest="${actual_digest,,}"
 if [[ "$actual_digest" != "$expected_digest" ]]; then
     echo "backup checksum mismatch; restore aborted before database mutation" >&2
@@ -47,4 +65,4 @@ fi
     --no-owner \
     --no-privileges \
     --dbname="$CALENDARWEAVE_RESTORE_DATABASE_URL" \
-    <"$backup_path"
+    <"$private_copy"
