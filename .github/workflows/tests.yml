@@ -14,7 +14,9 @@ concurrency:
 
 jobs:
   rust:
-    runs-on: ubuntu-24.04
+    runs-on:
+      group: CWL CI isolated
+      labels: [self-hosted, Linux, X64, calendarweave-ci]
     services:
       postgres:
         image: postgres:18.4-alpine@sha256:9a8afca54e7861fd90fab5fdf4c42477a6b1cb7d293595148e674e0a3181de15
@@ -44,7 +46,9 @@ jobs:
         run: cargo package --locked
 
   coverage:
-    runs-on: ubuntu-24.04
+    runs-on:
+      group: CWL CI isolated
+      labels: [self-hosted, Linux, X64, calendarweave-ci]
     services:
       postgres:
         image: postgres:18.4-alpine@sha256:9a8afca54e7861fd90fab5fdf4c42477a6b1cb7d293595148e674e0a3181de15
@@ -75,7 +79,9 @@ jobs:
       - run: jq -e '.data[0].totals.branches.percent == 100' coverage.json
 
   recovery:
-    runs-on: ubuntu-24.04
+    runs-on:
+      group: CWL CI isolated
+      labels: [self-hosted, Linux, X64, calendarweave-ci]
     services:
       postgres:
         image: postgres:18.4-alpine@sha256:9a8afca54e7861fd90fab5fdf4c42477a6b1cb7d293595148e674e0a3181de15

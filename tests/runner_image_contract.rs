@@ -2,23 +2,42 @@
 
 const TESTS_WORKFLOW: &str = include_str!("../.github/workflows/tests.yml");
 
+/// GitHub-hosted `ubuntu-*` labels are refused before a job starts while the
+/// account is locked for billing. The isolated self-hosted group is the path
+/// that actually executes the jobs.
 #[test]
-fn tests_workflow_uses_explicit_ubuntu_24_04_runners() {
+fn tests_workflow_uses_the_isolated_self_hosted_runner() {
     assert!(
-        !TESTS_WORKFLOW.contains("runs-on: ubuntu-latest"),
-        "floating ubuntu-latest can remain unassigned while explicit Ubuntu 24.04 executes"
+        !TESTS_WORKFLOW.contains("ubuntu-24.04") && !TESTS_WORKFLOW.contains("ubuntu-latest"),
+        "a GitHub-hosted image label is refused before the job starts"
     );
-
-    let configured_jobs = TESTS_WORKFLOW.matches("runs-on:").count();
-    let explicit_ubuntu_24_04_jobs = TESTS_WORKFLOW.matches("runs-on: ubuntu-24.04").count();
-
+    let jobs = TESTS_WORKFLOW.matches("runs-on:").count();
     assert!(
-        configured_jobs >= 3,
-        "Rust, coverage, and recovery jobs must all remain represented in the Tests workflow"
+        jobs >= 3,
+        "Rust, coverage, and recovery jobs must all remain represented"
     );
     assert_eq!(
-        explicit_ubuntu_24_04_jobs, configured_jobs,
-        "every Tests workflow job must use the observed healthy explicit Ubuntu 24.04 image"
+        TESTS_WORKFLOW.matches("group: CWL CI isolated").count(),
+        jobs,
+        "every job must target the isolated self-hosted runner group"
+    );
+    assert_eq!(
+        TESTS_WORKFLOW.matches("calendarweave-ci").count(),
+        jobs,
+        "every job must use the CalendarWeave runner label so it cannot land on another repo's runner"
+    );
+}
+
+/// No job may use the floating `ubuntu-latest` label, which can stay
+/// unassigned while an explicit runner label executes. The jobs run on the
+/// isolated self-hosted group (see
+/// `tests_workflow_uses_the_isolated_self_hosted_runner`), not on a
+/// GitHub-hosted image.
+#[test]
+fn tests_workflow_rejects_the_floating_ubuntu_latest_label() {
+    assert!(
+        !TESTS_WORKFLOW.contains("ubuntu-latest"),
+        "floating ubuntu-latest can remain unassigned"
     );
 }
 

@@ -28,6 +28,15 @@ require an operator-designed physical/WAL strategy.
    permissions. A failed dump is never published as a successful artifact.
 3. Restore rejects a missing, symbolic-link, malformed-checksum or
    checksum-mismatched artifact **before** invoking `pg_restore`.
+   Verification and restore use the same bytes: restore opens the archive
+   pathname exactly once, copies that single open file description into a
+   mode-`0600` file inside a fresh mode-`0700` `mktemp -d` directory, hashes
+   that private copy, and feeds `pg_restore` from it. The pathname is never
+   reopened after the open, so replacing it after the check cannot cause an
+   unverified archive to be restored (time-of-check/time-of-use). An `EXIT`
+   trap removes the private copy on success, checksum mismatch (exit 65),
+   `pg_restore` failure and signal termination. Missing/symlink evidence keeps
+   exit 66 and malformed/mismatched digests keep exit 65.
 4. A verified restore uses one PostgreSQL transaction so a restore error cannot
    leave a partially applied CalendarWeave schema/data set in the target used by
    this bounded workflow.
@@ -67,7 +76,9 @@ logical dumps from continuous WAL-based recovery.
 before `ops/postgres/backup_calendarweave.sh` and
 `ops/postgres/restore_calendarweave.sh`, and the repository `Tests` workflow
 runs it against the same pinned PostgreSQL 18.4 service used by persistence
-verification. Hosted exact-head execution remains authoritative; queued or
+verification. The drill also swaps a different valid archive over the backup
+pathname immediately after the digest is computed and requires the restored
+database to contain only the verified archive's data. Hosted exact-head execution remains authoritative; queued or
 predecessor-head runs are non-passing.
 
 Research-to-source interpretation and APA 7th references are recorded in

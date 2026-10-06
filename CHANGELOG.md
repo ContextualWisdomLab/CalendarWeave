@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Fix a time-of-check/time-of-use defect in `ops/postgres/restore_calendarweave.sh`: the archive is now opened exactly once, copied into an owner-only private copy (`0600` file in a `0700` `mktemp -d` directory), and that copy is both hashed and fed to `pg_restore`, so replacing the backup pathname after verification can no longer restore unverified bytes. The private copy is removed on every exit path; exit codes 65/66 and symlink rejection are unchanged.
+- Extend the recovery drill with a real PostgreSQL swap-after-digest regression, private-custody/cleanup checks (success, mismatch, `pg_restore` failure, `TERM`), and an opt-in owned local-cluster mode; CI still runs the docker service-container path.
+
 - Add the ADR-0010 source-candidate Calendar Port v0.1 metadata profile: optional single parameter-free DESCRIPTION and case-insensitive OPAQUE/TRANSPARENT, original-byte preservation, folded-duplicate rejection, and explicit unsupported parameters without changing schema or dependencies.
 - Retain twelve exact synthetic consumer serializer fixtures with provenance, metadata boundary tests, and real admission-wrapper controls using synthetic authorization decisions; no release, deployed identity, free/busy, or consumer migration is claimed.
 

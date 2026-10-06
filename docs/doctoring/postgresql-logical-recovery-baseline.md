@@ -25,6 +25,16 @@ applied target. PostgreSQL also documents that an omitted archive filename makes
 `pg_restore` read standard input, which permits the recovery script to verify the
 artifact digest before the archive stream reaches `pg_restore`.
 
+Checking one file and then reopening it by name is a classic
+time-of-check/time-of-use race (MITRE, n.d.). CalendarWeave therefore keeps a
+**single-open verification invariant**: the restore script opens the archive
+pathname once, copies that open file description into a private owner-only
+copy (`0600` file in a `0700` `mktemp -d` directory), hashes the copy, and
+streams the same copy into `pg_restore`. A stream cannot be rewound for a second
+reader, so the private copy is what binds the verified digest to the restored
+bytes. The copy is removed by an `EXIT` trap on every exit path and needs
+temporary space equal to the archive size.
+
 PostgreSQL's backup guidance distinguishes logical dumps from continuous
 archiving and point-in-time recovery. WAL archiving plus a base backup is the
 mechanism that supports recovery to a chosen point in time and materially lower
@@ -41,6 +51,7 @@ management and measured recovery exercises.
 | Single-transaction restore is all-or-nothing | Restore only after digest verification with `--single-transaction` | `ops/postgres/restore_calendarweave.sh` |
 | Restore is useful only if product invariants survive | Assert collection/event/revision values, collection+UID uniqueness and current-revision FK after restore | `tests/postgres_recovery_drill.sh` |
 | Backup content needs protection | `umask 077`, mode `0600`, reject symlink evidence and verify SHA-256 before restore | backup/restore scripts and recovery drill |
+| Verified bytes must be the restored bytes (CWE-367) | Open the archive once, verify and restore one private copy; never reopen the pathname | `ops/postgres/restore_calendarweave.sh`; swap and custody cases in `tests/postgres_recovery_drill.sh` |
 | Logical dump is not PITR | Keep RPO/RTO/WAL/PITR/HA open in commercialization baseline | ADR-0006 and `docs/product-technical-gap-baseline.md` |
 
 The SHA-256 sidecar is an application-level integrity check for accidental or
@@ -50,6 +61,9 @@ still needs authenticated access, encryption/key management, retention and
 independent durability controls.
 
 ## APA 7th references
+
+MITRE. (n.d.). *CWE-367: Time-of-check time-of-use (TOCTOU) race condition*.
+Retrieved October 6, 2026, from https://cwe.mitre.org/data/definitions/367.html
 
 PostgreSQL Global Development Group. (2026). *PostgreSQL 18 documentation:
 pg_dump*. https://www.postgresql.org/docs/18/app-pgdump.html
