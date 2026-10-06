@@ -36,7 +36,7 @@ else
     postgres_container="$(docker ps --format '{{.ID}} {{.Image}}' | awk '$2 ~ /^postgres:18\.4-alpine/ {print $1; exit}')"
     [[ -n "$postgres_container" ]] || { echo "PostgreSQL 18.4 service container not found" >&2; exit 1; }
     database_url() { printf 'postgres://postgres:postgres@localhost:5432/%s' "$1"; }
-    run_psql() { run_psql "$@"; }
+    run_psql() { docker exec -i "$postgres_container" psql "$@"; }
     cat >"$tmp_dir/pg_dump" <<EOF
 #!/usr/bin/env bash
 exec docker exec "$postgres_container" pg_dump "\$@"
